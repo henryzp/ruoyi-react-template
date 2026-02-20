@@ -51,6 +51,8 @@ interface AppActions {
   setActiveTabKey: (key: string) => void
   /** 刷新当前页面 */
   refresh: () => void
+  /** 重置所有状态（用于退出登录） */
+  reset: () => void
 }
 
 /**
@@ -178,6 +180,16 @@ export const useAppStore = create<AppStore>()(
       // 刷新当前页面
       refresh: () => {
         set((state) => ({ refreshKey: state.refreshKey + 1 }))
+      },
+
+      // 重置所有状态
+      reset: () => {
+        set({
+          sidebarCollapsed: false,
+          tabs: [],
+          activeTabKey: null,
+          refreshKey: 0,
+        })
       },
     }),
     {

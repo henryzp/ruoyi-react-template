@@ -1,4 +1,3 @@
-import { Outlet } from 'react-router-dom'
 import { Layout } from 'antd'
 import Sidebar from '@/components/Sidebar'
 import AppHeader from '@/components/AppHeader'
@@ -10,7 +9,7 @@ import { useEffect } from 'react'
 const { Content } = Layout
 
 export default function BasicLayout() {
-  const { sidebarCollapsed, refreshKey } = useAppStore()
+  const { sidebarCollapsed } = useAppStore()
 
   useEffect(() => {
     console.log('init layout');
@@ -24,27 +23,27 @@ export default function BasicLayout() {
       <Sidebar />
       <Layout style={{ marginLeft: sidebarCollapsed ? 64 : 200, transition: 'all 0.2s' }}>
         <AppHeader />
-        <div style={{ paddingTop: '64px' }}>
-          <NavTabs />
-          <Content
+        <NavTabs />
+        <Content
+          style={{
+            padding: '24px',
+            background: '#f0f2f5',
+            overflow: 'hidden',
+          }}
+        >
+          <div
             style={{
-              padding: '24px',
-              background: '#f0f2f5',
+              background: '#fff',
+              padding: 24,
+              borderRadius: 4,
+              height: '100%',
               overflow: 'auto',
+              boxSizing: 'border-box',
             }}
           >
-            <div
-              style={{
-                background: '#fff',
-                padding: 24,
-                borderRadius: 4,
-                minHeight: 'calc(100vh - 64px - 40px - 48px)',
-              }}
-            >
-              <KeepAliveOutlet />
-            </div>
-          </Content>
-        </div>
+            <KeepAliveOutlet />
+          </div>
+        </Content>
       </Layout>
     </Layout>
   )

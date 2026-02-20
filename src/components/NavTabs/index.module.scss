@@ -1,11 +1,3 @@
 .content {
-  :global(.ant-tabs-nav) {
-    height: 90vh;
-  }
-}
-
-.test {
-  :global(.ant-tabs-nav) {
-    height: 40px;
-  }
+  // 移除了 height: 90vh 的冲突样式
 }

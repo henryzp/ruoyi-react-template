@@ -154,7 +154,8 @@ export default function NavTabs() {
       style={{
         background: '#fff',
         borderBottom: '1px solid #f0f0f0',
-        padding: '0 16px',
+        padding: '64px 16px 0 16px',
+        boxSizing: 'border-box',
       }}
     >
       <Tabs

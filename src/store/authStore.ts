@@ -4,6 +4,7 @@ import type { UserInfo, LoginDto, LoginResponse } from '@/types/auth'
 import { TOKEN_KEY, REFRESH_TOKEN_KEY, USER_INFO_KEY, TENANT_ID_KEY, VISIT_TENANT_ID_KEY, MENUS_CACHE_KEY, USER_CACHE_KEY } from '@/types/auth'
 import { request } from '@/request'
 import { message } from 'antd'
+import { useAppStore } from '@/store/appStore'
 
 /**
  * 认证状态接口
@@ -200,8 +201,6 @@ export const useAuthStore = create<AuthStore>()(
           // 设置正在初始化标记
           set({ isInitializing: true })
 
-          // 获取用户信息（包含权限和角色）
-          const userInfo = await get().getUserInfo()
           // 设置已初始化标志
           get().setUserInfoInitialized(true)
           // 用户信息已经在 getUserInfo 中保存到 store 和 localStorage
@@ -223,6 +222,7 @@ export const useAuthStore = create<AuthStore>()(
 
       // 清除认证信息
       clearAuth: () => {
+        // 先清除所有 localStorage
         localStorage.removeItem(TOKEN_KEY)
         localStorage.removeItem(REFRESH_TOKEN_KEY)
         localStorage.removeItem(USER_INFO_KEY)
@@ -230,6 +230,12 @@ export const useAuthStore = create<AuthStore>()(
         localStorage.removeItem(MENUS_CACHE_KEY)
         localStorage.removeItem(USER_CACHE_KEY)
         localStorage.removeItem('userId')
+        localStorage.removeItem('app-storage')
+
+        // 清除 appStore 状态（包括 tabs）
+        useAppStore.getState().reset()
+
+        // 清除 authStore 状态
         set({
           token: null,
           refreshToken: null,
@@ -238,6 +244,12 @@ export const useAuthStore = create<AuthStore>()(
           isUserInfoInitialized: false,
           isInitializing: false,
         })
+
+        // 强制触发 zustand 的持久化更新，确保状态被清除
+        setTimeout(() => {
+          // 通过发送 storage 事件触发 zustand persist 中间件同步
+          window.dispatchEvent(new Event('storage'))
+        }, 0)
       },
     }),
     {

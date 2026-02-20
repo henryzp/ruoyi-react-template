@@ -1,6 +1,6 @@
 import {
   memo,
-  ReactNode,
+  type ReactNode,
   useEffect,
   useLayoutEffect,
   useMemo,
