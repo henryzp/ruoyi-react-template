@@ -8,6 +8,7 @@ import {
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useAppStore } from '@/store/appStore'
 import type { MenuProps } from 'antd'
+import styles from './index.module.scss'
 
 /**
  * 路径标题映射
@@ -150,14 +151,7 @@ export default function NavTabs() {
   )
 
   return (
-    <div
-      style={{
-        background: '#fff',
-        borderBottom: '1px solid #f0f0f0',
-        padding: '64px 16px 0 16px',
-        boxSizing: 'border-box',
-      }}
-    >
+    <div className={styles.navTabsWrapper}>
       <Tabs
         type="editable-card"
         hideAdd
@@ -168,8 +162,7 @@ export default function NavTabs() {
             handleCloseTab(targetKey as string)
           }
         }}
-        tabBarGutter={2}
-        indicator={{ size: (origin) => origin - 20, align: 'center' } as any}
+        tabBarGutter={4}
         items={tabs.map((tab) => ({
           key: tab.key,
           label: (
@@ -182,16 +175,12 @@ export default function NavTabs() {
                 }
               }}
             >
-              <span>{tab.label}</span>
+              <span className={styles.tabLabel}>{tab.label}</span>
             </Dropdown>
           ),
           closable: !tab.pinned,
         }))}
-        style={{
-          width: '100%',
-          height: '40px',
-          zIndex: 2,
-        }}
+        className={styles.navTabs}
       />
     </div>
   )

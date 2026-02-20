@@ -22,16 +22,12 @@ function generateBreadcrumbs(pathname: string, userInfo: any) {
     return []
   }
 
-  const breadcrumbs = [
-    {
-      title: '首页',
-      path: '/home',
-    },
-  ]
+  const breadcrumbs: Array<{ title: string; path: string }> = []
 
   // 根据当前路径生成面包屑
   // 这里可以根据实际的菜单数据来生成更精确的面包屑
   const pathMap: Record<string, string> = {
+    home: '首页',
     dashboard: '仪表盘',
     system: '系统管理',
     user: '用户管理',

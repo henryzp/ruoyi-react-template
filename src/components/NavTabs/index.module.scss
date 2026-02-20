@@ -1,3 +1,66 @@
-.content {
-  // 移除了 height: 90vh 的冲突样式
+.navTabsWrapper {
+  background: #fff;
+  border-bottom: 1px solid #f0f0f0;
+  padding: 64px 16px 0 16px;
+  box-sizing: border-box;
+  position: relative;
+}
+
+.navTabs {
+  :global {
+    .ant-tabs-nav {
+      margin-bottom: 0;
+      padding: 0 16px;
+    }
+
+    .ant-tabs-tab {
+      border: 1px solid #e8e8e8 !important;
+      border-radius: 6px 6px 0 0 !important;
+      background: #fafafa !important;
+      margin-right: 4px !important;
+      padding: 6px 16px !important;
+      font-size: 13px;
+      transition: all 0.2s ease;
+      position: relative;
+
+      &:hover {
+        background: #f0f0f0 !important;
+        border-color: #d9d9d9 !important;
+      }
+
+      &.ant-tabs-tab-active {
+        background: #fff !important;
+        border-color: #e8e8e8 !important;
+        border-bottom: 2px solid #1890ff !important;
+        font-weight: 600;
+        color: #262626;
+
+        .ant-tabs-tab-btn {
+          color: #262626;
+          font-weight: 600;
+        }
+      }
+    }
+
+    .ant-tabs-tab-remove {
+      margin-left: 8px;
+      font-size: 12px;
+
+      &:hover {
+        color: #ff4d4f;
+      }
+    }
+
+    .ant-tabs-ink-bar {
+      display: none;
+    }
+  }
+}
+
+.tabLabel {
+  display: inline-block;
+  max-width: 120px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
