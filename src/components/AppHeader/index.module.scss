@@ -13,6 +13,18 @@
   height: 64px;
   line-height: 64px;
   transition: left 0.2s;
+
+  // 移除所有按钮的 outline
+  :global {
+    .ant-btn {
+      outline: none !important;
+
+      &:focus,
+      &:active {
+        outline: none !important;
+      }
+    }
+  }
 }
 
 .left {

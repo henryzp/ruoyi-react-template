@@ -14,7 +14,7 @@ import styles from './index.module.scss'
 /**
  * 生成面包屑导航项
  */
-function generateBreadcrumbs(pathname: string, userInfo: any) {
+function generateBreadcrumbs(pathname: string) {
   const pathSegments = pathname.split('/').filter(Boolean)
 
   // 如果路径为空或只有一页，不显示面包屑
@@ -58,10 +58,10 @@ export default function AppHeader() {
   const { userInfo, logout } = useAuthStore()
   const { sidebarCollapsed, toggleSidebar } = useAppStore()
 
-  const breadcrumbs = generateBreadcrumbs(location.pathname, userInfo)
+  const breadcrumbs = generateBreadcrumbs(location.pathname)
 
   const headerStyle: React.CSSProperties = {
-    left: sidebarCollapsed ? 64 : 200,
+    left: sidebarCollapsed ? 0 : 200,
   }
 
   // 登出确认
@@ -103,7 +103,7 @@ export default function AppHeader() {
           type="text"
           icon={sidebarCollapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />}
           className={styles.collapseBtn}
-          onClick={toggleSidebar}
+          // onClick={toggleSidebar}
         />
         <Breadcrumb
           items={breadcrumbs.map((item) => ({
@@ -118,17 +118,9 @@ export default function AppHeader() {
           <Dropdown menu={{ items: userMenuItems }} placement="bottomRight">
             <Button type="text" className={styles.userBtn}>
               <UserOutlined />
-              <span className={styles.username}>{userInfo?.userName || '用户'}</span>
+              <span className={styles.username}>{userInfo?.nickname || '超级管理员'}</span>
             </Button>
           </Dropdown>
-          <Button
-            type="primary"
-            icon={<LogoutOutlined />}
-            onClick={handleLogout}
-            danger
-          >
-            退出
-          </Button>
         </Space>
       </div>
     </Layout.Header>
