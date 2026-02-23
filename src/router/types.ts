@@ -1,38 +1,41 @@
-import type { ComponentType, ReactNode } from 'react'
-import type { PathRouteProps } from 'react-router-dom'
+import type { ComponentType, ReactNode } from "react";
+import type { PathRouteProps } from "react-router-dom";
 
 /**
  * 路由配置项
  */
 export interface RouteItem {
   /** 路由ID，用于程序化跳转 */
-  id: string
+  id: string;
   /** 路由路径 */
-  path: string
+  path: string;
   /** 路由组件（支持懒加载） */
-  component?: ComponentType | ReactNode | (() => Promise<{ default: ComponentType }>);
+  component?:
+    | ComponentType
+    | ReactNode
+    | (() => Promise<{ default: ComponentType }>);
   /** 路由名称 */
-  name?: string
+  name?: string;
   /** 路由标题 */
-  title?: string
+  title?: string;
   /** 图标 */
-  icon?: ReactNode
+  icon?: ReactNode;
   /** 是否隐藏 */
-  hidden?: boolean
+  hidden?: boolean;
   /** 重定向路径 */
-  redirect?: string
+  redirect?: string;
   /** 子路由 */
-  routes?: RouteItem[]
+  routes?: RouteItem[];
   /** 元数据 */
-  meta?: RouteMeta
+  meta?: RouteMeta;
   /** 是否需要认证 */
-  auth?: boolean
+  auth?: boolean;
   /** 权限标识 */
-  permission?: string[]
+  permission?: string[];
   /** 角色标识 */
-  roles?: string[]
+  roles?: string[];
   /** 路由参数 */
-  props?: PathRouteProps
+  props?: PathRouteProps;
 }
 
 /**
@@ -40,21 +43,21 @@ export interface RouteItem {
  */
 export interface RouteMeta {
   /** 标题 */
-  title?: string
+  title?: string;
   /** 图标 */
-  icon?: ReactNode
+  icon?: ReactNode;
   /** 是否隐藏 */
-  hidden?: boolean
+  hidden?: boolean;
   /** 是否不需要缓存 */
-  noCache?: boolean
+  noCache?: boolean;
   /** 是否固定标签页 */
-  affix?: boolean
+  affix?: boolean;
   /** 链接地址 */
-  link?: string
+  link?: string;
   /** 是否在面包屑中隐藏 */
-  breadcrumb?: boolean
+  breadcrumb?: boolean;
   /** 是否在菜单中隐藏 */
-  hideInMenu?: boolean
+  hideInMenu?: boolean;
 }
 
 /**
@@ -62,74 +65,74 @@ export interface RouteMeta {
  */
 export interface RoutesStructDataItem {
   /** 路由ID */
-  id: string
+  id: string;
   /** 路由路径 */
-  path: string
+  path: string;
   /** 路由名称 */
-  name?: string
+  name?: string;
   /** 组件名称 */
-  componentName?: string
+  componentName?: string;
   /** 路由标题 */
-  title?: string
+  title?: string;
   /** 图标 */
-  icon?: string
+  icon?: string;
   /** 是否隐藏 */
-  hidden?: boolean
+  hidden?: boolean;
   /** 排序 */
-  sort?: number
+  sort?: number;
   /** 重定向 */
-  redirect?: string
+  redirect?: string;
   /** 子路由 */
-  children?: RoutesStructDataItem[]
+  children?: RoutesStructDataItem[];
   /** 元数据 */
-  meta?: RouteMeta
+  meta?: RouteMeta;
   /** 是否需要认证 */
-  auth?: boolean
+  auth?: boolean;
   /** 权限标识 */
-  permission?: string[]
+  permission?: string[];
   /** 角色标识 */
-  roles?: string[]
+  roles?: string[];
 }
 
 /**
  * 路由ID类型（使用字面量类型提供类型提示）
  */
 export type ROUTE_ID_KEY =
-  | 'HOME'
-  | 'LOGIN'
-  | '404'
-  | '403'
-  | 'DASHBOARD'
-  | 'SYSTEM'
-  | 'SYSTEM_USER'
-  | 'SYSTEM_ROLE'
-  | 'SYSTEM_MENU'
-  | 'SYSTEM_DEPT'
-  | 'SYSTEM_POST'
-  | 'SYSTEM_DICT'
-  | 'SYSTEM_CONFIG'
-  | 'SYSTEM_NOTICE'
-  | 'SYSTEM_LOG'
-  | string
+  | "HOME"
+  | "LOGIN"
+  | "404"
+  | "403"
+  | "DASHBOARD"
+  | "SYSTEM"
+  | "SYSTEM_USER"
+  | "SYSTEM_ROLE"
+  | "SYSTEM_MENU"
+  | "SYSTEM_DEPT"
+  | "SYSTEM_POST"
+  | "SYSTEM_DICT"
+  | "SYSTEM_CONFIG"
+  | "SYSTEM_NOTICE"
+  | "SYSTEM_LOG"
+  | string;
 
 /**
  * 菜单项
  */
 export interface MenuItem {
   /** 菜单key */
-  key: string
+  key: string;
   /** 菜单标题 */
-  label: string
+  label: string;
   /** 菜单图标 */
-  icon?: ReactNode
+  icon?: ReactNode;
   /** 路由路径 */
-  path?: string
+  path?: string;
   /** 子菜单 */
-  children?: MenuItem[]
+  children?: MenuItem[];
   /** 是否禁用 */
-  disabled?: boolean
+  disabled?: boolean;
   /** 是否隐藏 */
-  hidden?: boolean
+  hidden?: boolean;
 }
 
 /**
@@ -137,9 +140,9 @@ export interface MenuItem {
  */
 export interface BreadcrumbItem {
   /** 标题 */
-  title: string
+  title: string;
   /** 路径 */
-  path?: string
+  path?: string;
   /** 图标 */
-  icon?: ReactNode
+  icon?: ReactNode;
 }

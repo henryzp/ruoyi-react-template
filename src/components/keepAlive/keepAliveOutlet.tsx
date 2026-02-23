@@ -98,12 +98,9 @@ const KeepAliveOutlet = memo(() => {
   const isKeepAlive = tabs.some((tab) => tab.key === pathname);
 
   return (
-    <div style={{ position: 'relative', height: '100%' }}>
+    <div style={{ position: "relative", height: "100%" }}>
       {/* 容器 div，用于挂载 keep-alive 的 DOM */}
-      <div
-        ref={aliveParentRef}
-        style={{ height: "100%" }}
-      />
+      <div ref={aliveParentRef} style={{ height: "100%" }} />
 
       {/* 非 keep-alive 的路由直接渲染 */}
       {!isKeepAlive && <Outlet />}

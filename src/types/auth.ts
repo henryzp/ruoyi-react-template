@@ -3,17 +3,17 @@
  */
 export interface LoginDto {
   /** 用户名 */
-  username: string
+  username: string;
   /** 密码 */
-  password: string
+  password: string;
   /** 租户名称 */
-  tenantName?: string
+  tenantName?: string;
   /** 记住我 */
-  rememberMe?: boolean
+  rememberMe?: boolean;
   /** 验证码 */
-  code?: string
+  code?: string;
   /** 验证码UUID */
-  uuid?: string
+  uuid?: string;
 }
 
 /**
@@ -21,13 +21,13 @@ export interface LoginDto {
  */
 export interface LoginResponse {
   /** 访问令牌 */
-  accessToken: string
+  accessToken: string;
   /** 刷新令牌 */
-  refreshToken: string
+  refreshToken: string;
   /** 用户ID */
-  userId?: number
+  userId?: number;
   /** 过期时间（秒） */
-  expiresIn?: number
+  expiresIn?: number;
 }
 
 /**
@@ -35,29 +35,29 @@ export interface LoginResponse {
  */
 export interface UserInfo {
   /** 用户ID */
-  userId?: number
+  userId?: number;
   /** 用户名 */
-  username: string
+  username: string;
   /** 昵称 */
-  nickname?: string
+  nickname?: string;
   /** 头像 */
-  avatar?: string
+  avatar?: string;
   /** 邮箱 */
-  email?: string
+  email?: string;
   /** 手机号 */
-  phonenumber?: string
+  phonenumber?: string;
   /** 性别（0男 1女 2未知） */
-  sex?: string
+  sex?: string;
   /** 部门ID */
-  deptId?: number
+  deptId?: number;
   /** 角色列表 */
-  roles?: string[]
+  roles?: string[];
   /** 权限列表 */
-  permissions?: string[]
+  permissions?: string[];
   /** 菜单列表（路由数据） */
-  menus?: any[]
+  menus?: any[];
   /** 创建时间 */
-  createTime?: string
+  createTime?: string;
 }
 
 /**
@@ -65,26 +65,26 @@ export interface UserInfo {
  */
 export interface AuthState {
   /** 访问令牌 */
-  token: string | null
+  token: string | null;
   /** 刷新令牌 */
-  refreshToken: string | null
+  refreshToken: string | null;
   /** 用户信息 */
-  userInfo: UserInfo | null
+  userInfo: UserInfo | null;
 }
 
 /**
  * Token存储键
  */
-export const TOKEN_KEY = 'app-token'
-export const REFRESH_TOKEN_KEY = 'app-refresh-token'
-export const USER_INFO_KEY = 'app-user-info'
+export const TOKEN_KEY = "app-token";
+export const REFRESH_TOKEN_KEY = "app-refresh-token";
+export const USER_INFO_KEY = "app-user-info";
 /** 用户信息缓存键（包含权限和菜单） */
-export const USER_CACHE_KEY = 'app-user-cache'
+export const USER_CACHE_KEY = "app-user-cache";
 /** 菜单路由缓存键 */
-export const MENUS_CACHE_KEY = 'app-menus-cache'
+export const MENUS_CACHE_KEY = "app-menus-cache";
 
 /**
  * 租户相关存储键
  */
-export const TENANT_ID_KEY = 'tenant-id'
-export const VISIT_TENANT_ID_KEY = 'visit-tenant-id'
+export const TENANT_ID_KEY = "tenant-id";
+export const VISIT_TENANT_ID_KEY = "visit-tenant-id";

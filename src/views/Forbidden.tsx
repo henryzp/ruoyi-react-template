@@ -1,18 +1,25 @@
-import { Button, Result } from 'antd'
-import { useNavigate } from 'react-router-dom'
+import { Button, Result } from "antd";
+import { useNavigate } from "react-router-dom";
 
 /**
  * 403 禁止访问页面
  */
 export default function Forbidden() {
-  const navigate = useNavigate()
+  const navigate = useNavigate();
 
   const handleBackHome = () => {
-    navigate('/')
-  }
+    navigate("/");
+  };
 
   return (
-    <div style={{ height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+    <div
+      style={{
+        height: "100vh",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+      }}
+    >
       <Result
         status="403"
         title="403"
@@ -24,5 +31,5 @@ export default function Forbidden() {
         }
       />
     </div>
-  )
+  );
 }

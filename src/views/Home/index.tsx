@@ -1,6 +1,6 @@
-import { Card, Col, Row, Statistic } from 'antd'
-import { ArrowUpOutlined } from '@ant-design/icons'
-import { useEffect } from 'react'
+import { Card, Col, Row, Statistic } from "antd";
+import { ArrowUpOutlined } from "@ant-design/icons";
+import { useEffect } from "react";
 
 /**
  * 首页组件
@@ -9,9 +9,8 @@ import { useEffect } from 'react'
  * 这样无论用户在哪个页面刷新，都能正确获取权限信息
  */
 export default function HomePage() {
-
   useEffect(() => {
-    console.log('2222232421');
+    console.log("2222232421");
   }, []);
 
   return (
@@ -30,32 +29,20 @@ export default function HomePage() {
         </Col>
         <Col span={6}>
           <Card bordered={false}>
-            <Statistic
-              title="今日访问"
-              value={93}
-              suffix="次"
-            />
+            <Statistic title="今日访问" value={93} suffix="次" />
           </Card>
         </Col>
         <Col span={6}>
           <Card bordered={false}>
-            <Statistic
-              title="在线用户"
-              value={9}
-              suffix="人"
-            />
+            <Statistic title="在线用户" value={9} suffix="人" />
           </Card>
         </Col>
         <Col span={6}>
           <Card bordered={false}>
-            <Statistic
-              title="系统消息"
-              value={12}
-              suffix="条"
-            />
+            <Statistic title="系统消息" value={12} suffix="条" />
           </Card>
         </Col>
       </Row>
     </div>
-  )
+  );
 }

@@ -1,24 +1,24 @@
-import { create } from 'zustand'
-import { persist } from 'zustand/middleware'
-import type { RouteItem } from '@/router/types'
-import type { MenuItem } from '@/router/types'
+import { create } from "zustand";
+import { persist } from "zustand/middleware";
+import type { RouteItem } from "@/router/types";
+import type { MenuItem } from "@/router/types";
 
 /**
  * 权限状态接口
  */
 interface PermissionState {
   /** 路由列表 */
-  routes: RouteItem[]
+  routes: RouteItem[];
   /** 菜单列表 */
-  menus: MenuItem[]
+  menus: MenuItem[];
   /** 权限标识列表 */
-  permissions: string[]
+  permissions: string[];
   /** 角色标识列表 */
-  roles: string[]
+  roles: string[];
   /** 是否已加载 */
-  isLoaded: boolean
+  isLoaded: boolean;
   /** 是否加载中 */
-  loading: boolean
+  loading: boolean;
 }
 
 /**
@@ -26,21 +26,21 @@ interface PermissionState {
  */
 interface PermissionActions {
   /** 设置路由列表 */
-  setRoutes: (routes: RouteItem[]) => void
+  setRoutes: (routes: RouteItem[]) => void;
   /** 设置菜单列表 */
-  setMenus: (menus: MenuItem[]) => void
+  setMenus: (menus: MenuItem[]) => void;
   /** 设置权限列表 */
-  setPermissions: (permissions: string[]) => void
+  setPermissions: (permissions: string[]) => void;
   /** 设置角色列表 */
-  setRoles: (roles: string[]) => void
+  setRoles: (roles: string[]) => void;
   /** 清空权限信息 */
-  clearPermissions: () => void
+  clearPermissions: () => void;
 }
 
 /**
  * 权限 Store 类型
  */
-type PermissionStore = PermissionState & PermissionActions
+type PermissionStore = PermissionState & PermissionActions;
 
 /**
  * 权限 Store
@@ -76,11 +76,11 @@ export const usePermissionStore = create<PermissionStore>()(
           permissions: [],
           roles: [],
           isLoaded: false,
-        })
+        });
       },
     }),
     {
-      name: 'permission-storage', // localStorage key
+      name: "permission-storage", // localStorage key
       partialize: (state) => ({
         routes: state.routes,
         menus: state.menus,
@@ -88,29 +88,29 @@ export const usePermissionStore = create<PermissionStore>()(
         roles: state.roles,
         isLoaded: state.isLoaded,
       }),
-    }
-  )
-)
+    },
+  ),
+);
 
 /**
  * 快捷方法：获取权限列表
  */
 export const getPermissions = () => {
-  return usePermissionStore.getState().permissions
-}
+  return usePermissionStore.getState().permissions;
+};
 
 /**
  * 快捷方法：获取角色列表
  */
 export const getRoles = () => {
-  return usePermissionStore.getState().roles
-}
+  return usePermissionStore.getState().roles;
+};
 
 /**
  * 快捷方法：清空权限信息
  */
 export const clearPermissions = () => {
-  usePermissionStore.getState().clearPermissions()
-}
+  usePermissionStore.getState().clearPermissions();
+};
 
-export default usePermissionStore
+export default usePermissionStore;

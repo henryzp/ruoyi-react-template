@@ -1,8 +1,10 @@
 /**
  * 生成唯一 ID
  */
-export const UUID = (prefix: string = '') => {
-  const id = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+export const UUID = (prefix: string = "") => {
+  const id =
+    Math.random().toString(36).substring(2, 15) +
+    Math.random().toString(36).substring(2, 15);
   return prefix ? `${prefix}_${id}` : id;
 };
 

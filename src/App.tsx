@@ -1,6 +1,6 @@
-import { ConfigProvider, App as AntdApp } from 'antd'
-import zhCN from 'antd/locale/zh_CN'
-import { AppRouter } from '@/router'
+import { ConfigProvider, App as AntdApp } from "antd";
+import zhCN from "antd/locale/zh_CN";
+import { AppRouter } from "@/router";
 
 function App() {
   return (
@@ -9,7 +9,7 @@ function App() {
         <AppRouter />
       </AntdApp>
     </ConfigProvider>
-  )
+  );
 }
 
-export default App
+export default App;

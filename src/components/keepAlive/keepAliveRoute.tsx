@@ -35,7 +35,7 @@ function keepAliveRoute(props: KeepAliveComponentProps) {
     if (isActive) {
       // 激活时：将容器挂载到主容器
       // 先移除之前激活的容器
-      const oldDom = containerDiv.querySelector('[data-page-name]');
+      const oldDom = containerDiv.querySelector("[data-page-name]");
       if (oldDom && oldDom !== aliveDom) {
         containerDiv.removeChild(oldDom);
       }

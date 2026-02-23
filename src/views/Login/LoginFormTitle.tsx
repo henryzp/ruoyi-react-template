@@ -1,9 +1,9 @@
-import { Typography } from 'antd'
+import { Typography } from "antd";
 
-const { Title } = Typography
+const { Title } = Typography;
 
 interface LoginFormTitleProps {
-  title: string
+  title: string;
 }
 
 /**
@@ -14,5 +14,5 @@ export function LoginFormTitle({ title }: LoginFormTitleProps) {
     <div className="login-form-title">
       <Title level={2}>{title}</Title>
     </div>
-  )
+  );
 }

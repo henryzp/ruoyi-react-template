@@ -58,8 +58,11 @@ const useActive = (
     activeTabKey === location.pathname &&
     activeDepsRecord.current
   ) {
-    const depsEqual = JSON.stringify(activeDepsRecord.current) === JSON.stringify(activeDeps);
-    depSignature.current = depsEqual ? depSignature.current : Date.now().toString();
+    const depsEqual =
+      JSON.stringify(activeDepsRecord.current) === JSON.stringify(activeDeps);
+    depSignature.current = depsEqual
+      ? depSignature.current
+      : Date.now().toString();
 
     // 如果已经创建过，并且依赖变化了，重置状态
     if (isFirsted.current && !depsEqual) {
@@ -70,7 +73,10 @@ const useActive = (
   }
 
   useEffect(() => {
-    if (currentPath.current === location.pathname && activeTabKey === location.pathname) {
+    if (
+      currentPath.current === location.pathname &&
+      activeTabKey === location.pathname
+    ) {
       const isFirst = activeFlag.current ?? true;
       if (isFirst && onFirstActive) {
         onFirstActive?.();
@@ -92,7 +98,15 @@ const useActive = (
         activeFlag.current = isLast ? undefined : false;
       }
     };
-  }, [activeTabKey, depSignature.current, onActive, onFirstActive, onLastLeave, onLeave, tabs]);
+  }, [
+    activeTabKey,
+    depSignature.current,
+    onActive,
+    onFirstActive,
+    onLastLeave,
+    onLeave,
+    tabs,
+  ]);
 
   return () => {
     isFirsted.current = false;
