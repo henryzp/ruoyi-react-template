@@ -85,7 +85,7 @@ export default function DictTypeFormModal({
       title={title}
       onOk={handleSubmit}
       onCancel={handleCancel}
-      destroyOnClose
+      destroyOnHidden
       width={600}
     >
       <Form

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState, useRef } from "react";
 import {
   Form,
   Input,
@@ -11,17 +11,19 @@ import {
   Modal,
 } from "antd";
 import type { ColumnsType } from "antd/es/table";
-import type { Dayjs } from "dayjs";
 import type { DictTypeVO, PageParam } from "./api";
 import {
   getDictTypePage,
   deleteDictType,
   deleteDictTypeList,
   exportDictType,
+  toTablePageResult,
 } from "./api";
 import DictTypeFormModal from "./DictTypeFormModal";
 import DictDataModal from "./DictDataModal";
 import { exportFile } from "@/utils/download";
+import useTable from "@/hooks/useTable";
+import useCalcTableHeight from "@/hooks/useCalcTableHeight";
 
 // 通用状态枚举
 enum CommonStatusEnum {
@@ -37,21 +39,13 @@ const STATUS_OPTIONS = [
 
 export default function Dict() {
   const [form] = Form.useForm();
+  const tableContainerRef = useRef<HTMLDivElement>(null);
 
-  const [loading, setLoading] = useState(false);
-  const [dataSource, setDataSource] = useState<DictTypeVO[]>([]);
-  const [total, setTotal] = useState(0);
-  const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([]);
-  const [selectedIds, setSelectedIds] = useState<number[]>([]);
-  const [exportLoading, setExportLoading] = useState(false);
-
-  // 分页和搜索参数
-  const [pageNo, setPageNo] = useState(1);
-  const [pageSize, setPageSize] = useState(10);
+  // 搜索参数
   const [name, setName] = useState("");
   const [type, setType] = useState("");
   const [status, setStatus] = useState<number | undefined>(undefined);
-  const [createTime, setCreateTime] = useState<[Dayjs, Dayjs] | null>(null);
+  const [exportLoading, setExportLoading] = useState(false);
 
   // 字典类型表单弹窗状态
   const [typeFormVisible, setTypeFormVisible] = useState(false);
@@ -65,41 +59,35 @@ export default function Dict() {
   const [currentDictType, setCurrentDictType] = useState("");
   const [currentDictTypeName, setCurrentDictTypeName] = useState("");
 
-  // 加载数据
-  const loadData = async () => {
-    setLoading(true);
-    const params: PageParam = {
-      pageNo,
-      pageSize,
-      name: name || undefined,
-      type: type || undefined,
-      status,
-      createTime: createTime
-        ? [
-            createTime[0].format("YYYY-MM-DD HH:mm:ss"),
-            createTime[1].format("YYYY-MM-DD HH:mm:ss"),
-          ]
-        : undefined,
-    };
-    const { data, err } = await getDictTypePage({ params });
-    if (err) {
-      message.error("加载数据失败");
-    } else {
-      setDataSource(data!.list);
-      setTotal(data!.total);
-    }
-    setLoading(false);
-  };
+  // 计算表格内容区高度
+  const tableScrollY = useCalcTableHeight(tableContainerRef);
 
-  // 初始化加载数据
-  useEffect(() => {
-    loadData();
-  }, []);
+  // 使用 useTable hook
+  const tableProps = useTable<true>({
+    fetchData: async (pagination) => {
+      const params: PageParam = {
+        pageNo: pagination.pageNo,
+        pageSize: pagination.pageSize,
+        name: name || undefined,
+        type: type || undefined,
+        status,
+      };
+      const { data, err } = await getDictTypePage({ params });
+      if (!err && data) {
+        return {
+          err: null,
+          data: toTablePageResult(data, pagination.pageSize, pagination.pageNo),
+        };
+      }
+      return { err, data: null };
+    },
+    hasRowSelection: true,
+    rowKey: "id",
+  });
 
   // 搜索
   const handleSearch = () => {
-    setPageNo(1);
-    loadData();
+    tableProps.handleFetchData({ resetPageNo: true });
   };
 
   // 重置
@@ -108,8 +96,7 @@ export default function Dict() {
     setName("");
     setType("");
     setStatus(undefined);
-    setCreateTime(null);
-    setPageNo(1);
+    tableProps.handleFetchData({ resetPageNo: true });
   };
 
   // 打开新增弹窗
@@ -133,12 +120,13 @@ export default function Dict() {
       message.error("删除失败");
     } else {
       message.success("删除成功");
-      loadData();
+      tableProps.handleFetchData({});
     }
   };
 
   // 批量删除
   const handleDeleteBatch = async () => {
+    const selectedIds = tableProps.selectedRows.map((r) => r.id!);
     if (selectedIds.length === 0) {
       message.warning("请选择要删除的数据");
       return;
@@ -155,9 +143,8 @@ export default function Dict() {
           message.error("删除失败");
         } else {
           message.success("删除成功");
-          setSelectedRowKeys([]);
-          setSelectedIds([]);
-          loadData();
+          tableProps.resetSelectRowKeysFn();
+          tableProps.handleFetchData({});
         }
       },
     });
@@ -171,17 +158,11 @@ export default function Dict() {
       onOk: async () => {
         setExportLoading(true);
         const params: PageParam = {
-          pageNo,
-          pageSize,
+          pageNo: tableProps.pagination.current,
+          pageSize: tableProps.pagination.pageSize,
           name: name || undefined,
           type: type || undefined,
           status,
-          createTime: createTime
-            ? [
-                createTime[0].format("YYYY-MM-DD HH:mm:ss"),
-                createTime[1].format("YYYY-MM-DD HH:mm:ss"),
-              ]
-            : undefined,
         };
         const { data, err } = await exportDictType({ params });
         if (err) {
@@ -204,13 +185,7 @@ export default function Dict() {
 
   // 字典类型表单成功回调
   const handleTypeFormSuccess = () => {
-    loadData();
-  };
-
-  // 行选择变化
-  const handleRowSelectionChange = (keys: React.Key[], rows: DictTypeVO[]) => {
-    setSelectedRowKeys(keys);
-    setSelectedIds(rows.map((r) => r.id!));
+    tableProps.handleFetchData({});
   };
 
   const columns: ColumnsType<DictTypeVO> = [
@@ -283,9 +258,9 @@ export default function Dict() {
   ];
 
   return (
-    <div style={{ padding: 16 }}>
+    <>
       {/* 搜索表单 */}
-      <Form form={form} layout="inline">
+      <Form form={form} layout="inline" style={{ marginBottom: 16 }}>
         <Form.Item label="字典名称" name="name">
           <Input
             placeholder="请输入字典名称"
@@ -328,7 +303,7 @@ export default function Dict() {
             </Button>
             <Button
               danger
-              disabled={selectedIds.length === 0}
+              disabled={tableProps.selectedRows.length === 0}
               onClick={handleDeleteBatch}
             >
               批量删除
@@ -336,30 +311,23 @@ export default function Dict() {
           </Space>
         </Form.Item>
       </Form>
-      <div style={{ marginTop: 20 }}>
+
+      {/* 数据表格 */}
+      <div
+        ref={tableContainerRef}
+        style={{
+          marginTop: 16,
+          height: 'calc(100% - 48px)',
+          overflow: 'hidden'
+        }}
+      >
         <Table
-          rowKey="id"
-          loading={loading}
           columns={columns}
-          dataSource={dataSource}
-          scroll={{ x: "max-content" }}
-          rowSelection={{
-            selectedRowKeys,
-            onChange: handleRowSelectionChange,
-          }}
-          pagination={{
-            current: pageNo,
-            pageSize,
-            total,
-            showSizeChanger: true,
-            showTotal: (t) => `共 ${t} 条`,
-            onChange: (page, size) => {
-              setPageNo(page);
-              setPageSize(size);
-            },
-          }}
+          scroll={{ x: "max-content", y: tableScrollY || undefined }}
+          {...tableProps}
         />
       </div>
+
       {/* 字典类型表单弹窗 */}
       <DictTypeFormModal
         visible={typeFormVisible}
@@ -368,7 +336,6 @@ export default function Dict() {
         onCancel={() => setTypeFormVisible(false)}
         onSuccess={handleTypeFormSuccess}
       />
-
       {/* 字典数据管理弹窗 */}
       <DictDataModal
         visible={dataModalVisible}
@@ -376,6 +343,6 @@ export default function Dict() {
         dictTypeName={currentDictTypeName}
         onCancel={() => setDataModalVisible(false)}
       />
-    </div>
+    </>
   );
 }

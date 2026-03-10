@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import {
   Modal,
   Form,
@@ -22,8 +22,10 @@ import {
   deleteDictDataList,
   exportDictData,
   getDictData,
+  toTablePageResult,
 } from "./api";
 import { exportFile } from "@/utils/download";
+import useTable from "@/hooks/useTable";
 
 interface DictDataModalProps {
   visible: boolean;
@@ -63,15 +65,7 @@ export default function DictDataModal({
   const [form] = Form.useForm();
   const [dataForm] = Form.useForm();
 
-  const [loading, setLoading] = useState(false);
-  const [dataSource, setDataSource] = useState<DictDataVO[]>([]);
-  const [total, setTotal] = useState(0);
-  const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([]);
-  const [selectedIds, setSelectedIds] = useState<number[]>([]);
-
-  // 分页和搜索参数
-  const [pageNo, setPageNo] = useState(1);
-  const [pageSize, setPageSize] = useState(10);
+  // 搜索参数
   const [label, setLabel] = useState("");
   const [status, setStatus] = useState<number | undefined>(undefined);
 
@@ -83,38 +77,38 @@ export default function DictDataModal({
   const [dataFormId, setDataFormId] = useState<number | undefined>(undefined);
   const [dataFormLoading, setDataFormLoading] = useState(false);
 
-  // 加载数据
-  const loadData = async () => {
-    if (!visible) return;
-
-    setLoading(true);
-    const params: DictDataPageParam = {
-      pageNo,
-      pageSize,
-      dictType,
-      label: label || undefined,
-      status,
-    };
-    const { data, err } = await getDictDataPage({ params });
-    if (err) {
-      message.error("加载数据失败");
-    } else if (data) {
-      setDataSource(data.list);
-      setTotal(data.total);
-    }
-    setLoading(false);
-  };
-
-  useEffect(() => {
-    if (visible) {
-      loadData();
-    }
-  }, [visible, pageNo, pageSize, label, status, dictType]);
+  // 使用 useTable hook
+  const tableProps = useTable<true>({
+    fetchData: async (pagination) => {
+      const params: DictDataPageParam = {
+        pageNo: pagination.pageNo,
+        pageSize: pagination.pageSize,
+        dictType,
+        label: label || undefined,
+        status,
+      };
+      const { data, err } = await getDictDataPage({ params });
+      if (!err && data) {
+        return {
+          err: null,
+          data: toTablePageResult(data, pagination.pageSize, pagination.pageNo),
+        };
+      }
+      return { err, data: null };
+    },
+    hasRowSelection: true,
+    rowKey: "id",
+    defaultPagination: {
+      pageSize: 10,
+      pageNo: 1,
+    },
+    extraDependencies: [label, status, dictType],
+    hasFetchAuth: visible, // 只有在 modal 可见时才加载数据
+  });
 
   // 搜索
   const handleSearch = () => {
-    setPageNo(1);
-    loadData();
+    tableProps.handleFetchData({ resetPageNo: true });
   };
 
   // 重置
@@ -122,7 +116,7 @@ export default function DictDataModal({
     form.resetFields();
     setLabel("");
     setStatus(undefined);
-    setPageNo(1);
+    tableProps.handleFetchData({ resetPageNo: true });
   };
 
   // 打开新增弹窗
@@ -162,12 +156,13 @@ export default function DictDataModal({
       message.error("删除失败");
     } else {
       message.success("删除成功");
-      loadData();
+      tableProps.handleFetchData({});
     }
   };
 
   // 批量删除
   const handleDeleteBatch = async () => {
+    const selectedIds = tableProps.selectedRows.map((r) => r.id!);
     if (selectedIds.length === 0) {
       message.warning("请选择要删除的数据");
       return;
@@ -180,17 +175,16 @@ export default function DictDataModal({
       message.error("删除失败");
     } else {
       message.success("删除成功");
-      setSelectedRowKeys([]);
-      setSelectedIds([]);
-      loadData();
+      tableProps.resetSelectRowKeysFn();
+      tableProps.handleFetchData({});
     }
   };
 
   // 导出
   const handleExport = async () => {
     const params: DictDataPageParam = {
-      pageNo,
-      pageSize,
+      pageNo: tableProps.pagination.current,
+      pageSize: tableProps.pagination.pageSize,
       dictType,
       label: label || undefined,
       status,
@@ -226,7 +220,7 @@ export default function DictDataModal({
       } else {
         message.success(dataFormType === "create" ? "新增成功" : "修改成功");
         setDataFormVisible(false);
-        loadData();
+        tableProps.handleFetchData({});
       }
     } catch (error: any) {
       if (error.errorFields) {
@@ -236,12 +230,6 @@ export default function DictDataModal({
     } finally {
       setDataFormLoading(false);
     }
-  };
-
-  // 行选择变化
-  const handleRowSelectionChange = (keys: React.Key[], rows: DictDataVO[]) => {
-    setSelectedRowKeys(keys);
-    setSelectedIds(rows.map((r) => r.id!));
   };
 
   const columns: ColumnsType<DictDataVO> = [
@@ -334,7 +322,7 @@ export default function DictDataModal({
               <Button onClick={handleExport}>导出</Button>
               <Button
                 danger
-                disabled={selectedIds.length === 0}
+                disabled={tableProps.selectedRows.length === 0}
                 onClick={handleDeleteBatch}
               >
                 批量删除
@@ -345,26 +333,9 @@ export default function DictDataModal({
 
         {/* 数据表格 */}
         <Table
-          rowKey="id"
-          loading={loading}
           columns={columns}
-          dataSource={dataSource}
           scroll={{ x: 1000 }}
-          rowSelection={{
-            selectedRowKeys,
-            onChange: handleRowSelectionChange,
-          }}
-          pagination={{
-            current: pageNo,
-            pageSize,
-            total,
-            showSizeChanger: true,
-            showTotal: (t) => `共 ${t} 条`,
-            onChange: (page, size) => {
-              setPageNo(page);
-              setPageSize(size);
-            },
-          }}
+          {...tableProps}
         />
       </Modal>
 

@@ -45,11 +45,18 @@ export function Guard({
 
     // 如果在白名单中，不处理
     if (isInWhiteList) {
+      console.log("[Guard] 在白名单中，跳过检查:", currentPath);
       return;
     }
 
-    // 检查是否有 token（从 localStorage 读取）
+    // 检查是否有 token（直接从 localStorage 读取）
     const token = localStorage.getItem(TOKEN_KEY);
+    console.log("[Guard] token 检查:", {
+      hasToken: !!token,
+      currentPath,
+      isUserInfoInitialized,
+      isInitializing,
+    });
 
     // 如果没有 token，跳转到登录页
     if (!token) {
@@ -79,9 +86,9 @@ export function Guard({
         );
         if (!success) {
           // 初始化失败（token 无效或接口返回 401），跳转登录页
+          // 注意：如果是因为 401 且有 refresh_token，axios 拦截器会尝试刷新 token
+          // 这里只有 refresh_token 不存在或刷新失败时才会执行
           console.log("[Guard] 初始化失败，跳转到登录页");
-          // 清除 token，避免再次进入这个逻辑
-          localStorage.removeItem(TOKEN_KEY);
           navigate("/login", { replace: true });
         }
       });
@@ -92,7 +99,7 @@ export function Guard({
         cancelled = true;
       };
     }
-  }, [navigate, isUserInfoInitialized, isInitializing]);
+  }, [navigate, location, isUserInfoInitialized, isInitializing]);
 
   // 渲染子组件
   return <>{children}</>;

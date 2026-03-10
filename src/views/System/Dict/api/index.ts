@@ -49,11 +49,37 @@ export interface DictDataPageParam extends PageParam {
 }
 
 /**
- * 分页结果
+ * 分页结果（后端返回格式）
  */
 export interface PageResult<T> {
   list: T[];
   total: number;
+}
+
+/**
+ * 分页结果（useTable 期望格式）
+ */
+export interface TablePageResult<T> {
+  records: T[];
+  size: number;
+  current: number;
+  total: number;
+}
+
+/**
+ * 将后端分页结果转换为 useTable 期望格式
+ */
+export function toTablePageResult<T>(
+  data: PageResult<T>,
+  pageSize: number,
+  pageNo: number,
+): TablePageResult<T> {
+  return {
+    records: data.list,
+    size: pageSize,
+    current: pageNo,
+    total: data.total,
+  };
 }
 
 // ==================== 字典类型 API ====================

@@ -18,10 +18,6 @@ import { useAppStore } from "@/store/appStore";
  * 认证状态接口
  */
 interface AuthState {
-  /** 访问令牌 */
-  token: string | null;
-  /** 刷新令牌 */
-  refreshToken: string | null;
   /** 用户信息 */
   userInfo: UserInfo | null;
   /** 是否加载中 */
@@ -38,10 +34,6 @@ interface AuthState {
  * 认证操作接口
  */
 interface AuthActions {
-  /** 设置token */
-  setToken: (token: string) => void;
-  /** 设置刷新token */
-  setRefreshToken: (refreshToken: string) => void;
   /** 设置用户信息 */
   setUserInfo: (userInfo: UserInfo) => void;
   /** 登录 */
@@ -70,25 +62,11 @@ export const useAuthStore = create<AuthStore>()(
   persist(
     (set, get) => ({
       // 初始状态
-      token: null,
-      refreshToken: null,
       userInfo: null,
       loading: false,
       isAuthenticated: false,
       isUserInfoInitialized: false,
       isInitializing: false,
-
-      // 设置 token
-      setToken: (token: string) => {
-        localStorage.setItem(TOKEN_KEY, token);
-        set({ token, isAuthenticated: !!token });
-      },
-
-      // 设置刷新 token
-      setRefreshToken: (refreshToken: string) => {
-        localStorage.setItem(REFRESH_TOKEN_KEY, refreshToken);
-        set({ refreshToken });
-      },
 
       // 设置用户信息
       setUserInfo: (userInfo: UserInfo) => {
@@ -107,9 +85,9 @@ export const useAuthStore = create<AuthStore>()(
             data: credentials,
           });
 
-          // 保存 token
-          get().setToken(response.accessToken);
-          get().setRefreshToken(response.refreshToken);
+          // 保存 token 到 localStorage
+          localStorage.setItem(TOKEN_KEY, response.accessToken);
+          localStorage.setItem(REFRESH_TOKEN_KEY, response.refreshToken);
 
           // 保存 userId（用于后续请求）
           if (response.userId) {
@@ -155,6 +133,10 @@ export const useAuthStore = create<AuthStore>()(
       getUserInfo: async () => {
         try {
           console.log("[getUserInfo] 开始调用接口");
+          console.log("[getUserInfo] 当前 localStorage 中的 tokens:", {
+            accessToken: localStorage.getItem(TOKEN_KEY)?.substring(0, 20) + "...",
+            refreshToken: localStorage.getItem(REFRESH_TOKEN_KEY)?.substring(0, 20) + "...",
+          });
           // 调用获取权限信息接口（返回 user、roles、permissions、menus）
           const response = await request<{
             user: any;
@@ -206,7 +188,7 @@ export const useAuthStore = create<AuthStore>()(
         }
 
         // 检查是否有 token
-        const token = get().token || localStorage.getItem(TOKEN_KEY);
+        const token = localStorage.getItem(TOKEN_KEY);
         console.log("[initUserInfo] token:", !!token);
         if (!token) {
           console.log("[initUserInfo] 没有 token，返回 false");
@@ -226,9 +208,32 @@ export const useAuthStore = create<AuthStore>()(
 
           console.log("[initUserInfo] 返回 true");
           return true;
-        } catch (error) {
+        } catch (error: any) {
           console.error("[initUserInfo] 初始化用户信息失败:", error);
-          get().clearAuth();
+          console.log("[initUserInfo] 错误详情:", {
+            hasRefreshToken: !!localStorage.getItem(REFRESH_TOKEN_KEY),
+            errorStatus: error?.response?.status,
+            errorCode: error?.response?.data?.code,
+            errorMsg: error?.response?.data?.msg || error?.message,
+          });
+
+          const refreshToken = localStorage.getItem(REFRESH_TOKEN_KEY);
+
+          // 如果没有 refresh_token，直接清除认证信息
+          if (!refreshToken) {
+            console.log("[initUserInfo] 没有 refresh_token，清除认证信息");
+            get().clearAuth();
+          } else if (error?.response?.status === 401 || error?.response?.data?.code === 401) {
+            // 如果是 401 错误但有 refresh_token
+            // 说明 axios 拦截器已经尝试刷新 token 但仍然失败
+            // 此时应该清除认证信息
+            console.log("[initUserInfo] 401 错误且刷新 token 失败，清除认证信息");
+            get().clearAuth();
+          } else {
+            // 其他错误（网络错误、500 等），暂不清除认证信息
+            console.log("[initUserInfo] 其他错误（非 401），暂不清除认证信息");
+          }
+
           console.log("[initUserInfo] 返回 false (catch)");
           return false;
         } finally {
@@ -246,7 +251,7 @@ export const useAuthStore = create<AuthStore>()(
       // 清除认证信息
       clearAuth: () => {
         console.log("[clearAuth] 被调用！调用栈:", new Error().stack);
-        // 先清除所有 localStorage
+        // 清除所有 localStorage
         localStorage.removeItem(TOKEN_KEY);
         localStorage.removeItem(REFRESH_TOKEN_KEY);
         localStorage.removeItem(USER_INFO_KEY);
@@ -255,14 +260,13 @@ export const useAuthStore = create<AuthStore>()(
         localStorage.removeItem(USER_CACHE_KEY);
         localStorage.removeItem("userId");
         localStorage.removeItem("app-storage");
+        localStorage.removeItem("auth-storage"); // 清除 zustand persist 存储的 auth 状态
 
         // 清除 appStore 状态（包括 tabs）
         useAppStore.getState().reset();
 
         // 清除 authStore 状态
         set({
-          token: null,
-          refreshToken: null,
           userInfo: null,
           isAuthenticated: false,
           isUserInfoInitialized: false,
@@ -279,8 +283,6 @@ export const useAuthStore = create<AuthStore>()(
     {
       name: "auth-storage", // localStorage key
       partialize: (state) => ({
-        token: state.token,
-        refreshToken: state.refreshToken,
         userInfo: state.userInfo,
         // 不持久化 isAuthenticated，每次刷新都要重新验证
         // isAuthenticated: state.isAuthenticated,
@@ -293,19 +295,18 @@ export const useAuthStore = create<AuthStore>()(
 
 /**
  * 快捷方法：获取 token
+ * 直接从 localStorage 读取，不依赖 store
  */
 export const getToken = () => {
-  return useAuthStore.getState().token || localStorage.getItem(TOKEN_KEY);
+  return localStorage.getItem(TOKEN_KEY);
 };
 
 /**
  * 快捷方法：获取刷新 token
+ * 直接从 localStorage 读取，不依赖 store
  */
 export const getRefreshToken = () => {
-  return (
-    useAuthStore.getState().refreshToken ||
-    localStorage.getItem(REFRESH_TOKEN_KEY)
-  );
+  return localStorage.getItem(REFRESH_TOKEN_KEY);
 };
 
 /**

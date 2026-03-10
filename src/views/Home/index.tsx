@@ -18,7 +18,7 @@ export default function HomePage() {
       <h2>首页</h2>
       <Row gutter={16}>
         <Col span={6}>
-          <Card bordered={false}>
+          <Card variant="borderless">
             <Statistic
               title="总用户数"
               value={1128}
@@ -28,17 +28,17 @@ export default function HomePage() {
           </Card>
         </Col>
         <Col span={6}>
-          <Card bordered={false}>
+          <Card variant="borderless">
             <Statistic title="今日访问" value={93} suffix="次" />
           </Card>
         </Col>
         <Col span={6}>
-          <Card bordered={false}>
+          <Card variant="borderless">
             <Statistic title="在线用户" value={9} suffix="人" />
           </Card>
         </Col>
         <Col span={6}>
-          <Card bordered={false}>
+          <Card variant="borderless">
             <Statistic title="系统消息" value={12} suffix="条" />
           </Card>
         </Col>

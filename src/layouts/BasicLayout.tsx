@@ -4,27 +4,20 @@ import AppHeader from "@/components/AppHeader";
 import NavTabs from "@/components/NavTabs";
 import KeepAliveOutlet from "@/components/keepAlive/keepAliveOutlet";
 import { useAppStore } from "@/store/appStore";
-import { useEffect } from "react";
 
 const { Content } = Layout;
 
 export default function BasicLayout() {
   const { sidebarCollapsed } = useAppStore();
 
-  useEffect(() => {
-    console.log("init layout");
-    return () => {
-      console.log("unmount layout");
-    };
-  }, []);
-
   return (
-    <Layout style={{ minHeight: "100vh" }}>
+    <Layout style={{ height: '100%' }}>
       <Sidebar />
       <Layout
         style={{
           marginLeft: sidebarCollapsed ? 64 : 200,
           transition: "all 0.2s",
+          height: '100%'
         }}
       >
         <AppHeader />
@@ -33,7 +26,6 @@ export default function BasicLayout() {
           style={{
             padding: "24px",
             background: "#f0f2f5",
-            overflow: "hidden",
           }}
         >
           <div
@@ -41,9 +33,7 @@ export default function BasicLayout() {
               background: "#fff",
               padding: 24,
               borderRadius: 4,
-              height: "100%",
-              overflow: "auto",
-              boxSizing: "border-box",
+              height: '100%'
             }}
           >
             <KeepAliveOutlet />

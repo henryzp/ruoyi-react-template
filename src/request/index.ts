@@ -33,25 +33,31 @@ let requestList: Array<(token: string) => void> = [];
 async function refreshAccessToken(): Promise<string> {
   const refreshToken = getRefreshToken();
   if (!refreshToken) {
+    console.log("[refreshAccessToken] 没有 refresh token");
     throw new Error("No refresh token available");
   }
 
-  const response = await axios.post<{
+  console.log("[refreshAccessToken] 开始刷新 token");
+  const response = await instance.post<{
     code: number;
     data: { accessToken: string; refreshToken: string };
     msg: string;
-  }>(`${import.meta.env.VITE_APP_BASE_API}/auth/refresh`, {
+  }>(`/system/auth/refresh-token`, {
     refreshToken,
   });
 
   if (response.data.code === 0 && response.data.data) {
     const { accessToken, refreshToken: newRefreshToken } = response.data.data;
-    // 保存新 token
+    console.log("[refreshAccessToken] 刷新成功");
+
+    // 保存新 token 到 localStorage
     localStorage.setItem(TOKEN_KEY, accessToken);
     localStorage.setItem(REFRESH_TOKEN_KEY, newRefreshToken);
+
     return accessToken;
   }
 
+  console.log("[refreshAccessToken] 刷新失败");
   throw new Error("Refresh token failed");
 }
 
@@ -95,8 +101,16 @@ instance.interceptors.response.use(
   async (error: AxiosError<BackendResultFormat>) => {
     const { response, config } = error;
 
+    console.log("[axios interceptor] 响应错误:", {
+      url: config?.url,
+      status: response?.status,
+      code: response?.data?.code,
+      msg: response?.data?.msg,
+    });
+
     // 处理 401 未认证错误
     if (response?.status === 401 || response?.data?.code === 401) {
+      console.log("[axios interceptor] 检测到 401 错误，开始刷新 token");
       // 如果正在刷新 token，将请求加入队列
       if (isRefreshing) {
         return new Promise((resolve) => {
