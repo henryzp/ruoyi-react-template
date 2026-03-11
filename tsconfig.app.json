@@ -32,5 +32,13 @@
     /* Suppress deprecation warnings */
     "ignoreDeprecations": "6.0"
   },
-  "include": ["src"]
+  "include": ["src"],
+  "exclude": [
+    "**/*.md",
+    "docs",
+    "**/*.spec.ts",
+    "**/*.test.ts",
+    "**/*.spec.tsx",
+    "**/*.test.tsx"
+  ]
 }
