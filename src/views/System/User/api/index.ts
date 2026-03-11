@@ -163,56 +163,6 @@ export const getDeptTree = makeRequest<DeptVO[]>({
 });
 
 /**
- * 将平铺的部门列表转换为树形结构
- * @param list 平铺的部门列表
- * @returns 树形结构的部门列表
- */
-export function buildDeptTree(list: DeptVO[]): DeptVO[] {
-  const map = new Map<number, DeptVO>();
-  const tree: DeptVO[] = [];
-
-  // 第一遍：创建映射，并标准化字段
-  list.forEach((item) => {
-    const normalized: DeptVO = {
-      ...item,
-      // 统一字段名
-      deptName: item.deptName || item.name || "",
-      orderNum: item.orderNum ?? item.sort ?? 0,
-      children: [],
-    };
-    map.set(item.id!, normalized);
-  });
-
-  // 第二遍：构建树形结构
-  map.forEach((item) => {
-    const parent = map.get(item.parentId);
-    if (parent) {
-      if (!parent.children) {
-        parent.children = [];
-      }
-      parent.children.push(item);
-    } else {
-      // parentId 为 0 或找不到父节点的，作为根节点
-      tree.push(item);
-    }
-  });
-
-  // 按 orderNum 排序
-  const sortByOrder = (nodes: DeptVO[]) => {
-    nodes.sort((a, b) => (a.orderNum || 0) - (b.orderNum || 0));
-    nodes.forEach((node) => {
-      if (node.children && node.children.length > 0) {
-        sortByOrder(node.children);
-      }
-    });
-  };
-
-  sortByOrder(tree);
-
-  return tree;
-}
-
-/**
  * 查询部门列表（平铺列表）
  */
 export const getDeptList = makeRequest<DeptVO[]>({
@@ -285,7 +235,7 @@ export const resetUserPassword = makeRequest<
   void,
   { id: number; password: string }
 >({
-  url: "/system/user/reset-password",
+  url: "/system/user/update-password",
   method: "PUT",
 });
 

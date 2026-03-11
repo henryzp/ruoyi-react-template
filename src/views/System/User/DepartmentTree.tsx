@@ -2,8 +2,8 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { Input, Tree, Spin, message } from "antd";
 import type { TreeDataNode, TreeProps } from "antd";
 import { SearchOutlined } from "@ant-design/icons";
-import { getDeptTree, buildDeptTree, type DeptVO, DeptStatusEnum } from "./api";
-import { debounce } from "@/utils/fn";
+import { getDeptTree, type DeptVO, DeptStatusEnum } from "./api";
+import { buildDeptTree, debounce } from "@/utils/helper";
 
 interface DepartmentTreeProps {
   /** 部门选择回调 */

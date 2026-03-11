@@ -46,6 +46,50 @@
 | `borderless` | 无边框 | `bordered={false}` |
 | `filled` | 填充样式（新增） | - |
 
+## Modal 组件规范
+
+### 自定义弹窗 - 统一使用 MyModal
+
+项目中**所有自定义内容的弹窗**（如表单弹窗、详情弹窗等）必须统一使用 `@/components/MyModal` 组件。
+
+```tsx
+// ❌ 错误写法 - 直接使用 Modal
+import { Modal } from 'antd';
+
+<Modal open={visible} title="标题" onOk={handleOk} onCancel={handleCancel}>
+  <Form>...</Form>
+</Modal>
+
+// ✅ 正确写法 - 使用 MyModal
+import MyModal from '@/components/MyModal';
+
+<MyModal open={visible} title="标题" onOk={handleOk} onCancel={handleCancel}>
+  <Form>...</Form>
+</MyModal>
+```
+
+### Modal 静态方法（可继续使用）
+
+简单的确认对话框可以继续使用 Modal 的静态方法：
+
+```tsx
+// ✅ 可以使用
+Modal.confirm({
+  title: '确认删除',
+  content: '确定要删除这条数据吗？',
+  onOk: async () => {
+    // 确认后的操作
+  },
+});
+```
+
+### MyModal 特性
+
+- 禁用点击蒙层关闭（`maskClosable={false}`）
+- 默认居中显示（`centered`）
+- 支持内容区最大高度限制（`contentMaxHeight` 属性）
+- 自动销毁隐藏内容（`destroyOnHidden`）
+
 ## 其他常见组件
 
 ### Input / Select / TreeSelect 等
@@ -104,6 +148,7 @@
 
 在代码审查时，请检查以下内容：
 
+- [ ] 自定义弹窗是否使用了 `MyModal` 而非直接使用 `Modal`
 - [ ] Card 组件是否使用了 `bodyStyle` → 应改为 `styles.body`
 - [ ] Card 组件是否使用了 `headStyle` → 应改为 `styles.header`
 - [ ] Card 组件是否使用了 `bordered` → 应改为 `variant`
@@ -118,4 +163,5 @@
 
 | 日期 | 更新内容 |
 |------|----------|
+| 2026-03-11 | 添加 Modal 组件规范，要求统一使用 MyModal 组件 |
 | 2026-03-11 | 初始版本，记录 Card、Input、Select 组件的 API 变更 |

@@ -56,7 +56,7 @@ export default function AppHeader() {
   const navigate = useNavigate();
   const location = useLocation();
   const { userInfo, logout } = useAuthStore();
-  const { sidebarCollapsed, toggleSidebar } = useAppStore();
+  const { sidebarCollapsed /*,toggleSidebar*/ } = useAppStore();
 
   const breadcrumbs = generateBreadcrumbs(location.pathname);
 
