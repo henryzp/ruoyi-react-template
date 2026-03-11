@@ -15,7 +15,8 @@ import { UUID } from "@/utils/uuid";
 import { keepAliveHelper } from "@/utils/keepAliveHelper";
 
 const KeepAliveOutlet = memo(() => {
-  const { tabs, refreshKey } = useAppStore();
+  const { tabs, refreshKey, activeTabKey, setActiveTabKey, upsertTab } =
+    useAppStore();
   const outlet = useOutlet();
   const { pathname } = useLocation();
 
@@ -29,6 +30,17 @@ const KeepAliveOutlet = memo(() => {
   const prevCacheKeyRef = useRef<string>("");
   // 用于追踪上一次的 refreshKey
   const prevRefreshKeyRef = useRef<number>(0);
+
+  // 在路由变化时立即更新 activeTabKey，确保在渲染前状态同步
+  useLayoutEffect(() => {
+    // 忽略登录页等特殊页面
+    if (["/login", "/404", "/403"].includes(pathname)) {
+      return;
+    }
+
+    // 立即更新 activeTabKey，这样后续渲染时 isKeepAlive 判断就是正确的
+    setActiveTabKey(pathname);
+  }, [pathname, setActiveTabKey]);
 
   // 直接使用完整路径作为缓存 key
   const cacheKey = useMemo(() => {
@@ -95,7 +107,9 @@ const KeepAliveOutlet = memo(() => {
   const aliveParentRef = useRef<HTMLDivElement>(null);
 
   // 判断当前路由是否需要 keep-alive
-  const isKeepAlive = tabs.some((tab) => tab.key === pathname);
+  // 策略：所有非特殊页面都默认需要 keep-alive（从菜单打开的页面）
+  const isSpecialPage = ["/login", "/404", "/403"].includes(pathname);
+  const isKeepAlive = !isSpecialPage;
 
   return (
     <div style={{ position: "relative", height: "100%" }}>

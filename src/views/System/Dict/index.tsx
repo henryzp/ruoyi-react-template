@@ -226,7 +226,7 @@ export default function Dict() {
       align: "center",
       fixed: "right",
       render: (_, record) => (
-        <Space size="small">
+        <>
           <Button
             type="link"
             size="small"
@@ -252,7 +252,7 @@ export default function Dict() {
               删除
             </Button>
           </Popconfirm>
-        </Space>
+        </>
       ),
     },
   ];
@@ -317,8 +317,8 @@ export default function Dict() {
         ref={tableContainerRef}
         style={{
           marginTop: 16,
-          height: 'calc(100% - 48px)',
-          overflow: 'hidden'
+          height: "calc(100% - 48px)",
+          overflow: "hidden",
         }}
       >
         <Table

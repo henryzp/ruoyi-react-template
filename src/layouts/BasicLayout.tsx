@@ -11,13 +11,13 @@ export default function BasicLayout() {
   const { sidebarCollapsed } = useAppStore();
 
   return (
-    <Layout style={{ height: '100%' }}>
+    <Layout style={{ height: "100%" }}>
       <Sidebar />
       <Layout
         style={{
           marginLeft: sidebarCollapsed ? 64 : 200,
           transition: "all 0.2s",
-          height: '100%'
+          height: "100%",
         }}
       >
         <AppHeader />
@@ -33,7 +33,7 @@ export default function BasicLayout() {
               background: "#fff",
               padding: 24,
               borderRadius: 4,
-              height: '100%'
+              height: "100%",
             }}
           >
             <KeepAliveOutlet />

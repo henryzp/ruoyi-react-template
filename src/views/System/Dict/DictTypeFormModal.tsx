@@ -1,5 +1,6 @@
 import { useEffect } from "react";
-import { Modal, Form, Input, Radio, message } from "antd";
+import { Form, Input, Radio, message } from "antd";
+import MyModal from "@/components/MyModal";
 import type { DictTypeVO } from "./api";
 import { getDictType, createDictType, updateDictType } from "./api";
 
@@ -80,7 +81,7 @@ export default function DictTypeFormModal({
   };
 
   return (
-    <Modal
+    <MyModal
       open={visible}
       title={title}
       onOk={handleSubmit}
@@ -90,7 +91,9 @@ export default function DictTypeFormModal({
     >
       <Form
         form={form}
-        layout="vertical"
+        // layout="vertical"
+        labelCol={{ span: 4 }}
+        wrapperCol={{ span: 16 }}
         initialValues={{ status: CommonStatusEnum.ENABLE }}
       >
         <Form.Item
@@ -124,6 +127,6 @@ export default function DictTypeFormModal({
           <Input.TextArea rows={3} placeholder="请输入备注" />
         </Form.Item>
       </Form>
-    </Modal>
+    </MyModal>
   );
 }

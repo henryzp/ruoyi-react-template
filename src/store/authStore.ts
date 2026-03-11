@@ -134,8 +134,10 @@ export const useAuthStore = create<AuthStore>()(
         try {
           console.log("[getUserInfo] 开始调用接口");
           console.log("[getUserInfo] 当前 localStorage 中的 tokens:", {
-            accessToken: localStorage.getItem(TOKEN_KEY)?.substring(0, 20) + "...",
-            refreshToken: localStorage.getItem(REFRESH_TOKEN_KEY)?.substring(0, 20) + "...",
+            accessToken:
+              localStorage.getItem(TOKEN_KEY)?.substring(0, 20) + "...",
+            refreshToken:
+              localStorage.getItem(REFRESH_TOKEN_KEY)?.substring(0, 20) + "...",
           });
           // 调用获取权限信息接口（返回 user、roles、permissions、menus）
           const response = await request<{
@@ -223,11 +225,16 @@ export const useAuthStore = create<AuthStore>()(
           if (!refreshToken) {
             console.log("[initUserInfo] 没有 refresh_token，清除认证信息");
             get().clearAuth();
-          } else if (error?.response?.status === 401 || error?.response?.data?.code === 401) {
+          } else if (
+            error?.response?.status === 401 ||
+            error?.response?.data?.code === 401
+          ) {
             // 如果是 401 错误但有 refresh_token
             // 说明 axios 拦截器已经尝试刷新 token 但仍然失败
             // 此时应该清除认证信息
-            console.log("[initUserInfo] 401 错误且刷新 token 失败，清除认证信息");
+            console.log(
+              "[initUserInfo] 401 错误且刷新 token 失败，清除认证信息",
+            );
             get().clearAuth();
           } else {
             // 其他错误（网络错误、500 等），暂不清除认证信息

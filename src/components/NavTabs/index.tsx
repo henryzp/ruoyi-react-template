@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef } from "react";
 import { Tabs, Dropdown } from "antd";
 import {
   ReloadOutlined,
@@ -69,8 +69,8 @@ export default function NavTabs() {
   } = useAppStore();
   const currentTabRef = useRef<string>("");
 
-  // 监听路由变化，自动添加标签页
-  useEffect(() => {
+  // 监听路由变化，自动添加标签页（使用 useLayoutEffect 确保在渲染前执行）
+  useLayoutEffect(() => {
     // 忽略登录页等特殊页面
     if (["/login", "/404", "/403"].includes(location.pathname)) {
       return;

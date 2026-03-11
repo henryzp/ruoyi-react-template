@@ -1,5 +1,5 @@
-import type {PaginationProps} from 'antd';
-import { useEffect, useState } from 'react';
+import type { PaginationProps } from "antd";
+import { useEffect, useState, useRef } from "react";
 
 function getRemainList(allList: any[], subList: any[], key: string) {
   //1-遍历大数组
@@ -31,20 +31,20 @@ const isInteractiveElement = (element: HTMLElement | null): boolean => {
   const tagName = element.tagName.toLowerCase();
 
   // 停止递归条件：遇到<tr>或<td>时，不再继续向上递归
-  if (tagName === 'tr' || tagName === 'td') {
+  if (tagName === "tr" || tagName === "td") {
     return false;
   }
 
   // 判断是否是交互性元素
   if (
-    tagName === 'button' ||
-    tagName === 'a' ||
-    tagName === 'input' ||
-    tagName === 'textarea' ||
-    tagName === 'select' ||
-    element.getAttribute('role') === 'button' ||
-    element.getAttribute('data-stop-propagation') === 'true' || // 自定义属性
-    element.classList.contains('no-row-click') // 特定的 CSS 类名
+    tagName === "button" ||
+    tagName === "a" ||
+    tagName === "input" ||
+    tagName === "textarea" ||
+    tagName === "select" ||
+    element.getAttribute("role") === "button" ||
+    element.getAttribute("data-stop-propagation") === "true" || // 自定义属性
+    element.classList.contains("no-row-click") // 特定的 CSS 类名
   ) {
     return true;
   }
@@ -93,7 +93,7 @@ export default <T extends boolean = false>(props: {
     pageSize?: number;
     pageNo?: number;
   };
-  rowSelectionType?: 'checkbox' | 'radio';
+  rowSelectionType?: "checkbox" | "radio";
   extraDependencies?: any[];
   defaultPageSizeOptions?: string[];
 }): MyTableProps<T> => {
@@ -102,14 +102,14 @@ export default <T extends boolean = false>(props: {
     hasRowSelection = false,
     resetSelectRowKeys = true,
     defaultSelectedRows = [],
-    rowKey = 'id',
+    rowKey = "id",
     hasFetchAuth = true,
     defaultPagination = {
       pageSize: 10,
       pageNo: 1,
     },
-    defaultPageSizeOptions = ['10', '20', '50', '100'],
-    rowSelectionType = 'checkbox',
+    defaultPageSizeOptions = ["10", "20", "50", "100"],
+    rowSelectionType = "checkbox",
     extraDependencies = [],
   } = props;
 
@@ -124,11 +124,38 @@ export default <T extends boolean = false>(props: {
   );
   const [selectedRows, setSelectedRows] = useState<any[]>(defaultSelectedRows);
 
+  // 防止重复请求的标志 - 使用 Ref 避免被重新渲染重置
+  const isFetchingRef = useRef(false);
+  const lastFetchTimeRef = useRef(0);
+  const INITIAL_FETCH_DEBOUNCE = 1000; // 防止初始重复请求的时间窗口（毫秒）
+
   const handleFetchData = async ({
     resetPageNo,
   }: {
     resetPageNo?: boolean;
   }) => {
+    const now = Date.now();
+    const timeSinceLastFetch = now - lastFetchTimeRef.current;
+
+    // 防止短时间内重复请求
+    // 如果正在请求，或者距离上次请求时间太短（小于 100ms），则跳过
+    // 或者是初始加载时的重复请求（小于 1000ms 且页码未变）
+    const isInitialDuplicate =
+      timeSinceLastFetch < INITIAL_FETCH_DEBOUNCE &&
+      timeSinceLastFetch > 0 &&
+      pagination.pageNo === 1 &&
+      pagination.pageSize === 10;
+
+    if (
+      isFetchingRef.current ||
+      timeSinceLastFetch < 100 ||
+      isInitialDuplicate
+    ) {
+      return;
+    }
+
+    isFetchingRef.current = true;
+    lastFetchTimeRef.current = now;
     setLoading(true);
     if (hasRowSelection && resetSelectRowKeys) {
       setSelectedRowKeys([]);
@@ -145,6 +172,7 @@ export default <T extends boolean = false>(props: {
       });
     }
     setLoading(false);
+    isFetchingRef.current = false;
   };
 
   let rowSelection = undefined;
@@ -157,7 +185,7 @@ export default <T extends boolean = false>(props: {
     if (isInteractiveElement(target)) {
       return; // 不触发行点击事件
     }
-    if (rowSelectionType === 'checkbox') {
+    if (rowSelectionType === "checkbox") {
       const isSelected = selectedRowKeys.includes(record[rowKey]);
       if (isSelected) {
         // 如果已经选中，则过滤掉
@@ -184,7 +212,7 @@ export default <T extends boolean = false>(props: {
       fixed: true,
       selectedRowKeys,
       onSelect: (record: any, selected: boolean) => {
-        if (rowSelectionType === 'checkbox') {
+        if (rowSelectionType === "checkbox") {
           if (selected) {
             setSelectedRowKeys([...selectedRowKeys, record[rowKey]]);
             setSelectedRows([...selectedRows, record]);
@@ -234,7 +262,13 @@ export default <T extends boolean = false>(props: {
     if (hasFetchAuth) {
       handleFetchData({});
     }
-  }, [pagination.pageNo, pagination.pageSize, ...extraDependencies]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    pagination.pageNo,
+    pagination.pageSize,
+    hasFetchAuth,
+    ...extraDependencies,
+  ]);
 
   const resetSelectRowKeysFn = () => {
     setSelectedRowKeys([]);

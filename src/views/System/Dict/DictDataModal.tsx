@@ -1,6 +1,5 @@
 import { useState } from "react";
 import {
-  Modal,
   Form,
   Input,
   Select,
@@ -12,6 +11,7 @@ import {
   message,
   Popconfirm,
 } from "antd";
+import MyModal from "@/components/MyModal";
 import type { ColumnsType } from "antd/es/table";
 import type { DictDataVO, DictDataPageParam } from "./api";
 import {
@@ -65,10 +65,6 @@ export default function DictDataModal({
   const [form] = Form.useForm();
   const [dataForm] = Form.useForm();
 
-  // 搜索参数
-  const [label, setLabel] = useState("");
-  const [status, setStatus] = useState<number | undefined>(undefined);
-
   // 字典数据表单弹窗状态
   const [dataFormVisible, setDataFormVisible] = useState(false);
   const [dataFormType, setDataFormType] = useState<"create" | "update">(
@@ -80,12 +76,14 @@ export default function DictDataModal({
   // 使用 useTable hook
   const tableProps = useTable<true>({
     fetchData: async (pagination) => {
+      // 从 form 获取搜索参数
+      const formValues = form.getFieldsValue();
       const params: DictDataPageParam = {
         pageNo: pagination.pageNo,
         pageSize: pagination.pageSize,
         dictType,
-        label: label || undefined,
-        status,
+        label: formValues.label || undefined,
+        status: formValues.status,
       };
       const { data, err } = await getDictDataPage({ params });
       if (!err && data) {
@@ -102,7 +100,7 @@ export default function DictDataModal({
       pageSize: 10,
       pageNo: 1,
     },
-    extraDependencies: [label, status, dictType],
+    extraDependencies: [dictType],
     hasFetchAuth: visible, // 只有在 modal 可见时才加载数据
   });
 
@@ -114,8 +112,6 @@ export default function DictDataModal({
   // 重置
   const handleReset = () => {
     form.resetFields();
-    setLabel("");
-    setStatus(undefined);
     tableProps.handleFetchData({ resetPageNo: true });
   };
 
@@ -182,12 +178,14 @@ export default function DictDataModal({
 
   // 导出
   const handleExport = async () => {
+    // 从 form 获取搜索参数
+    const formValues = form.getFieldsValue();
     const params: DictDataPageParam = {
       pageNo: tableProps.pagination.current,
       pageSize: tableProps.pagination.pageSize,
       dictType,
-      label: label || undefined,
-      status,
+      label: formValues.label || undefined,
+      status: formValues.status,
     };
     const { data, err } = await exportDictData({ params });
     if (err) {
@@ -255,7 +253,7 @@ export default function DictDataModal({
       align: "center",
       fixed: "right",
       render: (_, record) => (
-        <Space size="small">
+        <>
           <Button
             type="link"
             size="small"
@@ -274,37 +272,39 @@ export default function DictDataModal({
               删除
             </Button>
           </Popconfirm>
-        </Space>
+        </>
       ),
     },
   ];
 
   return (
     <>
-      <Modal
+      <MyModal
         open={visible}
         title={`字典数据管理 - ${dictTypeName || dictType}`}
         onCancel={onCancel}
         footer={null}
-        width={1200}
-        destroyOnClose
+        width={1000}
+        destroyOnHidden
       >
         {/* 搜索表单 */}
-        <Form form={form} layout="inline" style={{ marginBottom: 16 }}>
+        <Form
+          form={form}
+          layout="inline"
+          style={{ marginBottom: 16 }}
+          preserve={false}
+        >
           <Form.Item label="字典标签" name="label">
             <Input
               placeholder="请输入字典标签"
-              value={label}
-              onChange={(e) => setLabel(e.target.value)}
               onPressEnter={handleSearch}
               style={{ width: 180 }}
+              allowClear
             />
           </Form.Item>
           <Form.Item label="状态" name="status">
             <Select
               placeholder="请选择状态"
-              value={status}
-              onChange={setStatus}
               allowClear
               style={{ width: 120 }}
               options={STATUS_OPTIONS}
@@ -334,24 +334,26 @@ export default function DictDataModal({
         {/* 数据表格 */}
         <Table
           columns={columns}
-          scroll={{ x: 1000 }}
+          scroll={{ x: "max-content" }}
           {...tableProps}
         />
-      </Modal>
+      </MyModal>
 
       {/* 字典数据表单弹窗 */}
-      <Modal
+      <MyModal
         open={dataFormVisible}
         title={dataFormType === "create" ? "新增字典数据" : "修改字典数据"}
         onOk={handleDataFormSubmit}
         onCancel={() => setDataFormVisible(false)}
         confirmLoading={dataFormLoading}
-        destroyOnClose
+        destroyOnHidden
         width={600}
       >
         <Form
           form={dataForm}
-          layout="vertical"
+          // layout="vertical"
+          labelCol={{ span: 4 }}
+          wrapperCol={{ span: 16 }}
           initialValues={{
             status: CommonStatusEnum.ENABLE,
             colorType: "default",
@@ -418,7 +420,7 @@ export default function DictDataModal({
             <Input.TextArea rows={3} placeholder="请输入备注" />
           </Form.Item>
         </Form>
-      </Modal>
+      </MyModal>
     </>
   );
 }
