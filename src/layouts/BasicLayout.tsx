@@ -25,19 +25,14 @@ export default function BasicLayout() {
         <Content
           style={{
             padding: "24px",
-            background: "#f0f2f5",
+            background: "#fff",
+            margin: "16px",
+            borderRadius: 4,
+            height: "100%",
+            overflow: "hidden",
           }}
         >
-          <div
-            style={{
-              background: "#fff",
-              padding: 24,
-              borderRadius: 4,
-              height: "100%",
-            }}
-          >
-            <KeepAliveOutlet />
-          </div>
+          <KeepAliveOutlet />
         </Content>
       </Layout>
     </Layout>

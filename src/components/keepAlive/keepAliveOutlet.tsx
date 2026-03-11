@@ -15,14 +15,11 @@ import { UUID } from "@/utils/uuid";
 import { keepAliveHelper } from "@/utils/keepAliveHelper";
 
 const KeepAliveOutlet = memo(() => {
-  const { tabs, refreshKey, activeTabKey, setActiveTabKey, upsertTab } =
-    useAppStore();
+  const { tabs, refreshKey, setActiveTabKey } = useAppStore();
   const outlet = useOutlet();
   const { pathname } = useLocation();
 
   const componentList = useRef(new Map<string, ReactNode>());
-  const outletRef = useRef<ReactNode | null>(null);
-  outletRef.current = outlet;
   const [, setCacheSig] = useState(UUID());
   const forceUpdate = useForceUpdate();
 
@@ -91,8 +88,8 @@ const KeepAliveOutlet = memo(() => {
     });
 
     // 缓存当前组件
-    if (!componentList.current.has(cacheKey) && outletRef.current) {
-      componentList.current.set(cacheKey, outletRef.current);
+    if (!componentList.current.has(cacheKey) && outlet) {
+      componentList.current.set(cacheKey, outlet);
 
       // 只有当添加新组件时才需要强制更新
       forceUpdate();
@@ -112,14 +109,15 @@ const KeepAliveOutlet = memo(() => {
   const isKeepAlive = !isSpecialPage;
 
   return (
-    <div style={{ position: "relative", height: "100%" }}>
-      {/* 容器 div，用于挂载 keep-alive 的 DOM */}
-      <div ref={aliveParentRef} style={{ height: "100%" }} />
-
+    <>
       {/* 非 keep-alive 的路由直接渲染 */}
       {!isKeepAlive && <Outlet />}
 
+      {/* keep-alive 容器 */}
+      {isKeepAlive && <div ref={aliveParentRef} style={{ height: "100%" }} />}
+
       {/* 渲染所有 keep-alive 的组件 */}
+      {/* eslint-disable react-hooks/refs -- componentList 是数据 ref，不是 DOM ref */}
       {Array.from(componentList.current).map(([key, component]) => {
         return (
           <KeepAliveRoute
@@ -132,7 +130,8 @@ const KeepAliveOutlet = memo(() => {
           </KeepAliveRoute>
         );
       })}
-    </div>
+      {/* eslint-enable react-hooks/refs */}
+    </>
   );
 });
 
