@@ -31,20 +31,10 @@ let requestList: Array<(token: string) => void> = [];
  * 处理 401 错误：刷新 token 并重试请求
  */
 async function handle401Error(error: any, config?: any): Promise<any> {
-  console.log("[handle401Error] 开始处理 401 错误", {
-    isRefreshing,
-    hasConfig: !!config,
-    url: config?.url,
-  });
-
   // 如果正在刷新 token，将请求加入队列
   if (isRefreshing) {
-    console.log("[handle401Error] 正在刷新，将请求加入队列");
     return new Promise((resolve) => {
       requestList.push((newToken: string) => {
-        console.log("[handle401Error] 队列中的请求准备重试", {
-          url: config?.url,
-        });
         if (config?.headers) {
           config.headers.Authorization = `Bearer ${newToken}`;
         }
@@ -55,21 +45,12 @@ async function handle401Error(error: any, config?: any): Promise<any> {
 
   // 开始刷新 token
   isRefreshing = true;
-  console.log("[handle401Error] 开始刷新 token 流程");
 
   try {
     const newToken = await refreshAccessToken();
     isRefreshing = false;
-    console.log("[handle401Error] token 刷新成功，准备重试请求", {
-      newToken: newToken?.substring(0, 20) + "...",
-      url: config?.url,
-    });
 
     // 执行队列中的请求
-    console.log(
-      "[handle401Error] 执行队列中的请求，队列长度:",
-      requestList.length,
-    );
     requestList.forEach((callback) => callback(newToken));
     requestList = [];
 
@@ -77,7 +58,6 @@ async function handle401Error(error: any, config?: any): Promise<any> {
     if (config?.headers) {
       config.headers.Authorization = `Bearer ${newToken}`;
     }
-    console.log("[handle401Error] 开始重试当前请求:", config?.url);
     return instance(config!);
   } catch (refreshError) {
     // 刷新失败，清除认证信息并跳转登录页
@@ -85,7 +65,6 @@ async function handle401Error(error: any, config?: any): Promise<any> {
     requestList = [];
     clearAuth();
 
-    console.log("[handle401Error] token 刷新失败，清除认证信息");
     message.error("登录已过期，请重新登录");
     window.location.href = "/login";
 
@@ -97,66 +76,32 @@ async function handle401Error(error: any, config?: any): Promise<any> {
  * 刷新 token
  */
 async function refreshAccessToken(): Promise<string> {
-  try {
-    const refreshToken = getRefreshToken();
-    if (!refreshToken) {
-      const log = "[refreshAccessToken] 没有 refresh token";
-      console.log(log);
-      localStorage.setItem("debug_refresh_token", log);
-      throw new Error("No refresh token available");
-    }
-
-    const log1 = "[refreshAccessToken] 开始刷新 token";
-    console.log(log1);
-    localStorage.setItem("debug_refresh_token", log1);
-
-    const response = await instance.post<{
-      code: number;
-      data: any;
-      msg: string;
-    }>(`/system/auth/refresh-token`, null, {
-      params: {
-        refreshToken: refreshToken,
-      },
-    });
-
-    const log2 =
-      "[refreshAccessToken] 收到响应: " +
-      JSON.stringify({
-        status: response.status,
-        code: response.data.code,
-        msg: response.data.msg,
-        hasData: !!response.data.data,
-      });
-    console.log(log2);
-    localStorage.setItem("debug_refresh_token_response", log2);
-
-    if (response.data.code === 0 && response.data.data) {
-      const { accessToken, refreshToken: newRefreshToken } = response.data.data;
-      const log3 = "[refreshAccessToken] 刷新成功";
-      console.log(log3);
-      localStorage.setItem("debug_refresh_token", log3);
-
-      // 保存新 token 到 localStorage
-      localStorage.setItem(TOKEN_KEY, accessToken);
-      localStorage.setItem(REFRESH_TOKEN_KEY, newRefreshToken);
-
-      const log4 = "[refreshAccessToken] 新 token 已保存";
-      console.log(log4);
-      localStorage.setItem("debug_refresh_token", log4);
-      return accessToken;
-    }
-
-    const log5 = "[refreshAccessToken] 刷新失败 - code 不为 0 或没有 data";
-    console.log(log5);
-    localStorage.setItem("debug_refresh_token", log5);
-    throw new Error("Refresh token failed: " + response.data.msg);
-  } catch (error: any) {
-    const log = "[refreshAccessToken] 捕获异常: " + error.message;
-    console.log(log);
-    localStorage.setItem("debug_refresh_token_error", log);
-    throw error;
+  const refreshToken = getRefreshToken();
+  if (!refreshToken) {
+    throw new Error("No refresh token available");
   }
+
+  const response = await instance.post<{
+    code: number;
+    data: any;
+    msg: string;
+  }>(`/system/auth/refresh-token`, null, {
+    params: {
+      refreshToken: refreshToken,
+    },
+  });
+
+  if (response.data.code === 0 && response.data.data) {
+    const { accessToken, refreshToken: newRefreshToken } = response.data.data;
+
+    // 保存新 token 到 localStorage
+    localStorage.setItem(TOKEN_KEY, accessToken);
+    localStorage.setItem(REFRESH_TOKEN_KEY, newRefreshToken);
+
+    return accessToken;
+  }
+
+  throw new Error("Refresh token failed: " + response.data.msg);
 }
 
 /**
@@ -196,10 +141,6 @@ instance.interceptors.response.use(
   (response: AxiosResponse<BackendResultFormat>) => {
     // 检查业务错误码 401（HTTP 200 但 code: 401）
     if (response.data?.code === 401) {
-      console.log("[axios interceptor] 业务错误码 401，开始刷新 token", {
-        url: response.config?.url,
-        msg: response.data.msg,
-      });
       return handle401Error(null, response.config);
     }
     return response;
@@ -207,16 +148,8 @@ instance.interceptors.response.use(
   async (error: AxiosError<BackendResultFormat>) => {
     const { response, config } = error;
 
-    console.log("[axios interceptor] 响应错误:", {
-      url: config?.url,
-      status: response?.status,
-      code: response?.data?.code,
-      msg: response?.data?.msg,
-    });
-
     // 处理 401 未认证错误
     if (response?.status === 401 || response?.data?.code === 401) {
-      console.log("[axios interceptor] 检测到 401 错误，开始刷新 token");
       return handle401Error(error, config);
     }
 

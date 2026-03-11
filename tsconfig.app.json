@@ -27,7 +27,10 @@
     "noUnusedLocals": true,
     "noUnusedParameters": true,
     "noFallthroughCasesInSwitch": true,
-    "noUncheckedSideEffectImports": true
+    "noUncheckedSideEffectImports": true,
+
+    /* Suppress deprecation warnings */
+    "ignoreDeprecations": "6.0"
   },
   "include": ["src"]
 }

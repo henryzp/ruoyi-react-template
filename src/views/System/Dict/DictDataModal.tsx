@@ -285,7 +285,6 @@ export default function DictDataModal({
         onCancel={onCancel}
         footer={null}
         width={1000}
-        destroyOnHidden
       >
         {/* 搜索表单 */}
         <Form

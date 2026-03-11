@@ -132,13 +132,6 @@ export const useAuthStore = create<AuthStore>()(
       // 获取用户信息
       getUserInfo: async () => {
         try {
-          console.log("[getUserInfo] 开始调用接口");
-          console.log("[getUserInfo] 当前 localStorage 中的 tokens:", {
-            accessToken:
-              localStorage.getItem(TOKEN_KEY)?.substring(0, 20) + "...",
-            refreshToken:
-              localStorage.getItem(REFRESH_TOKEN_KEY)?.substring(0, 20) + "...",
-          });
           // 调用获取权限信息接口（返回 user、roles、permissions、menus）
           const response = await request<{
             user: any;
@@ -149,7 +142,6 @@ export const useAuthStore = create<AuthStore>()(
             url: "/system/auth/get-permission-info",
             method: "GET",
           });
-          console.log("[getUserInfo] 接口返回成功:", response);
 
           // 构造 UserInfo 对象
           const userInfo: any = {
@@ -172,58 +164,39 @@ export const useAuthStore = create<AuthStore>()(
           }
           localStorage.setItem(USER_CACHE_KEY, JSON.stringify(userInfo));
 
-          console.log("[getUserInfo] 返回 userInfo");
           return userInfo;
         } catch (error) {
-          console.error("[getUserInfo] 获取用户信息失败:", error);
           throw error;
         }
       },
 
       // 初始化用户信息和权限（类似 hr-front 的 setUserInfoAction）
       initUserInfo: async () => {
-        console.log("[initUserInfo] 开始执行，实例 ID:", Math.random());
         // 防止重复请求
         if (get().isInitializing) {
-          console.log("[initUserInfo] 正在初始化用户信息，跳过重复请求");
           return false;
         }
 
         // 检查是否有 token
         const token = localStorage.getItem(TOKEN_KEY);
-        console.log("[initUserInfo] token:", !!token);
         if (!token) {
-          console.log("[initUserInfo] 没有 token，返回 false");
           get().clearAuth();
           return false;
         }
 
         try {
           // 设置正在初始化标记
-          console.log("[initUserInfo] 设置 isInitializing = true");
           set({ isInitializing: true });
 
           // 调用 getUserInfo 获取最新的权限信息
-          console.log("[initUserInfo] 准备调用 getUserInfo");
           const result = await get().getUserInfo();
-          console.log("[initUserInfo] getUserInfo 执行完成，结果:", result);
 
-          console.log("[initUserInfo] 返回 true");
           return true;
         } catch (error: any) {
-          console.error("[initUserInfo] 初始化用户信息失败:", error);
-          console.log("[initUserInfo] 错误详情:", {
-            hasRefreshToken: !!localStorage.getItem(REFRESH_TOKEN_KEY),
-            errorStatus: error?.response?.status,
-            errorCode: error?.response?.data?.code,
-            errorMsg: error?.response?.data?.msg || error?.message,
-          });
-
           const refreshToken = localStorage.getItem(REFRESH_TOKEN_KEY);
 
           // 如果没有 refresh_token，直接清除认证信息
           if (!refreshToken) {
-            console.log("[initUserInfo] 没有 refresh_token，清除认证信息");
             get().clearAuth();
           } else if (
             error?.response?.status === 401 ||
@@ -232,20 +205,12 @@ export const useAuthStore = create<AuthStore>()(
             // 如果是 401 错误但有 refresh_token
             // 说明 axios 拦截器已经尝试刷新 token 但仍然失败
             // 此时应该清除认证信息
-            console.log(
-              "[initUserInfo] 401 错误且刷新 token 失败，清除认证信息",
-            );
             get().clearAuth();
-          } else {
-            // 其他错误（网络错误、500 等），暂不清除认证信息
-            console.log("[initUserInfo] 其他错误（非 401），暂不清除认证信息");
           }
 
-          console.log("[initUserInfo] 返回 false (catch)");
           return false;
         } finally {
           // 重置正在初始化标记
-          console.log("[initUserInfo] finally 块，设置 isInitializing = false");
           set({ isInitializing: false });
         }
       },
