@@ -113,68 +113,112 @@ export const copyToClipboard = async (
 // ==================== 数据结构工具 ====================
 
 /**
- * 将平铺的部门列表转换为树形结构
- * @param list 平铺的部门列表
- * @returns 树形结构的部门列表
+ * 将平铺的列表转换为树形结构（通用方法）
+ * @param list 平铺的列表
+ * @param options 配置选项
+ * @returns 树形结构的列表
  */
-export function buildDeptTree<
+export function buildTree<
   T extends {
-    id?: number;
-    parentId: number;
-    name?: string;
-    deptName?: string;
-    sort?: number;
-    orderNum?: number;
+    id?: number | string;
+    parentId: number | string;
     children?: T[];
     [key: string]: any;
   },
->(list: T[]): T[] {
-  const map = new Map<number, T>();
-  const tree: T[] = [];
+>(
+  list: T[],
+  options?: {
+    /** 根节点的 parentId 值，默认为 0 */
+    rootParentId?: number | string;
+    /** 排序字段，默认为 'sort'，兼容 'orderNum' */
+    sortField?: string;
+    /** 是否清理空的 children 数组，默认为 true */
+    cleanEmptyChildren?: boolean;
+  },
+): T[] {
+  const { rootParentId = 0, sortField = "sort", cleanEmptyChildren = true } = options || {};
 
-  // 第一遍：创建映射，并标准化字段
-  list.forEach((item) => {
-    const normalized: T = {
-      ...item,
-      // 统一字段名：优先使用 deptName，否则使用 name
-      deptName: item.deptName || item.name || "",
-      orderNum: item.orderNum ?? item.sort ?? 0,
-      children: [],
-    };
-    map.set(item.id!, normalized);
-  });
+  console.time('[buildTree] 总耗时');
+  console.log('[buildTree] 数据量:', list.length);
 
-  // 第二遍：构建树形结构
-  map.forEach((item) => {
-    const parent = map.get(item.parentId);
-    if (parent) {
-      if (!parent.children) {
-        parent.children = [];
-      }
-      parent.children.push(item);
-    } else {
-      // parentId 为 0 或找不到父节点的，作为根节点
-      tree.push(item);
+  // 1. 使用 Map 存储 ID → 节点的映射（避免重复查找）
+  const nodeMap = new Map<number | string, T>();
+  // 2. 使用 Map 存储 parentId → children 的映射（构建树时直接使用）
+  const childrenMap = new Map<number | string, T[]>();
+
+  console.time('[buildTree] 建立 Map 映射');
+  // 单次遍历：建立两个映射
+  for (const item of list) {
+    if (item.id === undefined) continue;
+
+    nodeMap.set(item.id, item);
+
+    // 初始化 children 数组
+    if (!childrenMap.has(item.parentId)) {
+      childrenMap.set(item.parentId, []);
     }
-  });
+    childrenMap.get(item.parentId)!.push(item);
+  }
+  console.timeEnd('[buildTree] 建立 Map 映射');
 
-  // 按 orderNum 排序
-  const sortByOrder = (nodes: T[]) => {
-    nodes.sort((a, b) => (a.orderNum || 0) - (b.orderNum || 0));
-    nodes.forEach((node) => {
-      if (node.children && node.children.length > 0) {
-        sortByOrder(node.children);
-      }
-    });
+  // 提取排序函数到外部，避免每次递归都创建（性能优化）
+  const getSortValue = (item: T): number => {
+    const value = item[sortField];
+    return typeof value === "number" ? value : 0;
   };
 
-  sortByOrder(tree);
+  let recursionCount = 0;
+  let sortCount = 0;
 
-  return tree;
+  // 3. 递归构建树（构建时排序，避免后续遍历）
+  const build = (parentId: number | string): T[] => {
+    recursionCount++;
+    const children = childrenMap.get(parentId);
+    if (!children) return [];
+
+    // 复制数组后再排序，避免修改原数据（性能优化）
+    sortCount++;
+    const sortedChildren = [...children].sort((a, b) => getSortValue(a) - getSortValue(b));
+
+    const result: T[] = [];
+    for (let i = 0; i < sortedChildren.length; i++) {
+      const item = sortedChildren[i];
+      // 递归构建子树
+      const itemChildren = build(item.id!);
+
+      // 根据选项决定是否清理空的 children
+      if (itemChildren.length > 0) {
+        // 有子节点：创建新对象并设置 children
+        result.push({ ...item, children: itemChildren });
+      } else if (cleanEmptyChildren) {
+        // 清理模式：移除空的 children 属性
+        // 只有当原 item 有 children 属性时才创建新对象
+        const itemWithChildren = item as any;
+        if (itemWithChildren.children !== undefined) {
+          const { children: _removed, ...rest } = itemWithChildren;
+          result.push(rest as T);
+        } else {
+          result.push(item);
+        }
+      } else {
+        // 保留模式：直接返回原 item
+        result.push(item);
+      }
+    }
+    return result;
+  };
+
+  const result = build(rootParentId);
+
+  console.log('[buildTree] 递归次数:', recursionCount);
+  console.log('[buildTree] 排序次数:', sortCount);
+  console.timeEnd('[buildTree] 总耗时');
+
+  return result;
 }
 
 /**
- * 在部门树中搜索匹配的节点
+ * 在树中搜索匹配的节点（优化版）
  * 搜索规则：
  * 1. 匹配名称包含关键词的节点
  * 2. 包含匹配节点的所有子孙节点
@@ -182,7 +226,7 @@ export function buildDeptTree<
  * @param options 搜索选项
  * @returns 过滤后的树形数据
  */
-export function searchDeptTree<
+export function searchTree<
   T extends {
     id?: number | string;
     parentId: number;
@@ -205,11 +249,22 @@ export function searchDeptTree<
     return treeData;
   }
 
-  // 扁平化树形数据，建立 ID 到节点对象的映射
+  // 1. 扁平化树形数据，同时建立 ID 到节点的映射和 parentId 到 children 的映射
   const flattenList: T[] = [];
+  const nodeMap = new Map<number | string, T>();
+  const childrenMap = new Map<number | string, T[]>();
+
   const flatten = (items: T[]) => {
     for (const item of items) {
       flattenList.push(item);
+      nodeMap.set(item.id!, item);
+
+      // 建立 parentId → children 的映射，避免后续重复 filter
+      if (!childrenMap.has(item.parentId)) {
+        childrenMap.set(item.parentId, []);
+      }
+      childrenMap.get(item.parentId)!.push(item);
+
       if (item.children) {
         flatten(item.children);
       }
@@ -217,25 +272,21 @@ export function searchDeptTree<
   };
   flatten(treeData);
 
-  // 建立 ID 到节点的映射
-  const nodeMap = new Map<number | string, T>();
-  flattenList.forEach(node => nodeMap.set(node.id!, node));
-
-  // 收集所有需要保留的节点ID
+  // 2. 收集所有需要保留的节点ID（使用 Set 快速查找）
   const keepIds = new Set<number | string>();
 
-  // 添加某个节点及其所有子孙
+  // 添加某个节点及其所有子孙（使用 childrenMap，O(1) 查找子节点）
   const addDescendants = (nodeId: number | string) => {
-    const node = nodeMap.get(nodeId);
-    if (!node) return;
-    keepIds.add(nodeId);
-    // 查找所有子节点
-    flattenList.filter(n => n.parentId === nodeId).forEach(child => {
+    const children = childrenMap.get(nodeId);
+    if (!children) return;
+
+    for (const child of children) {
+      keepIds.add(child.id!);
       addDescendants(child.id!);
-    });
+    }
   };
 
-  // 添加某个节点到根节点的路径
+  // 添加某个节点到根节点的路径（使用 nodeMap，O(1) 查找父节点）
   const addAncestors = (nodeId: number | string) => {
     const node = nodeMap.get(nodeId);
     if (!node || node.parentId === 0) return;
@@ -243,33 +294,41 @@ export function searchDeptTree<
     addAncestors(node.parentId);
   };
 
-  // 搜索匹配的节点
-  flattenList.forEach(node => {
+  // 3. 搜索匹配的节点（只遍历一次）
+  const lowerSearchValue = searchValue.toLowerCase();
+  for (const node of flattenList) {
     // 兼容 name 和 deptName 字段
     const nodeName = (node[nameField as keyof T] as string) || "";
-    if (nodeName.toLowerCase().includes(searchValue.toLowerCase())) {
+    if (nodeName.toLowerCase().includes(lowerSearchValue)) {
+      keepIds.add(node.id!);
       // 1. 添加该节点及其所有子孙
       addDescendants(node.id!);
       // 2. 添加该节点到根节点的所有祖先
       addAncestors(node.id!);
     }
-  });
+  }
 
   if (keepIds.size === 0) {
     return [];
   }
 
-  // 过滤出需要保留的节点并重建树形结构
+  // 4. 重建树形结构（使用 childrenMap，避免重复 filter）
   const buildTree = (parentId = 0): T[] => {
-    return flattenList
-      .filter(item => item.parentId === parentId && keepIds.has(item.id!))
-      .map(item => {
-        const children = buildTree(Number(item.id));
-        return {
+    const children = childrenMap.get(parentId);
+    if (!children) return [];
+
+    const result: T[] = [];
+    for (const item of children) {
+      if (keepIds.has(item.id!)) {
+        const itemChildren = buildTree(Number(item.id));
+        // 只修改 children 属性，避免深拷贝
+        result.push({
           ...item,
-          children: children.length > 0 ? children : undefined,
-        } as T;
-      });
+          children: itemChildren.length > 0 ? itemChildren : undefined,
+        } as T);
+      }
+    }
+    return result;
   };
 
   return buildTree(0);
