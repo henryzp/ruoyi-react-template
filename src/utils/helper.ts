@@ -172,3 +172,106 @@ export function buildDeptTree<
 
   return tree;
 }
+
+/**
+ * 在部门树中搜索匹配的节点
+ * 搜索规则：
+ * 1. 匹配名称包含关键词的节点
+ * 2. 包含匹配节点的所有子孙节点
+ * 3. 包含匹配节点到根节点的所有祖先节点
+ * @param options 搜索选项
+ * @returns 过滤后的树形数据
+ */
+export function searchDeptTree<
+  T extends {
+    id?: number | string;
+    parentId: number;
+    name?: string;
+    deptName?: string;
+    children?: T[];
+    [key: string]: any;
+  },
+>(options: {
+  /** 树形数据 */
+  treeData: T[];
+  /** 搜索关键词 */
+  searchValue: string;
+  /** 名称字段，默认为 'name'，兼容 'deptName' */
+  nameField?: string;
+}): T[] {
+  const { treeData, searchValue, nameField = "name" } = options;
+
+  if (!searchValue) {
+    return treeData;
+  }
+
+  // 扁平化树形数据，建立 ID 到节点对象的映射
+  const flattenList: T[] = [];
+  const flatten = (items: T[]) => {
+    for (const item of items) {
+      flattenList.push(item);
+      if (item.children) {
+        flatten(item.children);
+      }
+    }
+  };
+  flatten(treeData);
+
+  // 建立 ID 到节点的映射
+  const nodeMap = new Map<number | string, T>();
+  flattenList.forEach(node => nodeMap.set(node.id!, node));
+
+  // 收集所有需要保留的节点ID
+  const keepIds = new Set<number | string>();
+
+  // 添加某个节点及其所有子孙
+  const addDescendants = (nodeId: number | string) => {
+    const node = nodeMap.get(nodeId);
+    if (!node) return;
+    keepIds.add(nodeId);
+    // 查找所有子节点
+    flattenList.filter(n => n.parentId === nodeId).forEach(child => {
+      addDescendants(child.id!);
+    });
+  };
+
+  // 添加某个节点到根节点的路径
+  const addAncestors = (nodeId: number | string) => {
+    const node = nodeMap.get(nodeId);
+    if (!node || node.parentId === 0) return;
+    keepIds.add(node.parentId);
+    addAncestors(node.parentId);
+  };
+
+  // 搜索匹配的节点
+  flattenList.forEach(node => {
+    // 兼容 name 和 deptName 字段
+    const nodeName = (node[nameField as keyof T] as string) || "";
+    if (nodeName.toLowerCase().includes(searchValue.toLowerCase())) {
+      // 1. 添加该节点及其所有子孙
+      addDescendants(node.id!);
+      // 2. 添加该节点到根节点的所有祖先
+      addAncestors(node.id!);
+    }
+  });
+
+  if (keepIds.size === 0) {
+    return [];
+  }
+
+  // 过滤出需要保留的节点并重建树形结构
+  const buildTree = (parentId = 0): T[] => {
+    return flattenList
+      .filter(item => item.parentId === parentId && keepIds.has(item.id!))
+      .map(item => {
+        const children = buildTree(Number(item.id));
+        return {
+          ...item,
+          children: children.length > 0 ? children : undefined,
+        } as T;
+      });
+  };
+
+  return buildTree(0);
+}
+

@@ -3,7 +3,7 @@ import { Input, Tree, Spin, message } from "antd";
 import type { TreeDataNode, TreeProps } from "antd";
 import { SearchOutlined } from "@ant-design/icons";
 import { getDeptTree, type DeptVO, DeptStatusEnum } from "./api";
-import { buildDeptTree, debounce } from "@/utils/helper";
+import { buildDeptTree, searchDeptTree, debounce } from "@/utils/helper";
 
 interface DepartmentTreeProps {
   /** 部门选择回调 */
@@ -12,59 +12,50 @@ interface DepartmentTreeProps {
 
 /**
  * 将部门数据转换为 Tree 组件需要的数据格式
+ * @param depts 部门数据
+ * @param searchValue 搜索关键词（用于高亮）
  */
-function convertToTreeData(depts: DeptVO[]): TreeDataNode[] {
-  return depts.map((dept) => ({
-    key: dept.id!,
-    title: dept.deptName,
-    children: dept.children ? convertToTreeData(dept.children) : undefined,
-    isLeaf: !dept.children || dept.children.length === 0,
-    // 停用的部门显示为灰色
-    disabled: dept.status === DeptStatusEnum.DISABLE,
-  }));
-}
-
-/**
- * 在树中搜索包含关键词的节点
- */
-function searchInTree(
-  treeData: TreeDataNode[],
-  searchValue: string,
-): TreeDataNode[] {
-  const result: TreeDataNode[] = [];
-
-  for (const node of treeData) {
-    const title = String(node.title);
-    const children = node.children as TreeDataNode[];
-
-    if (title.toLowerCase().includes(searchValue.toLowerCase())) {
-      // 当前节点匹配，保留整个子树
-      result.push({
-        ...node,
-        children: children ? searchInTree(children, searchValue) : undefined,
-      });
-    } else if (children && children.length > 0) {
-      // 当前节点不匹配，但子节点中有匹配的
-      const matchedChildren = searchInTree(children, searchValue);
-      if (matchedChildren.length > 0) {
-        result.push({
-          ...node,
-          children: matchedChildren,
-        });
-      }
+function convertToTreeData(depts: DeptVO[], searchValue?: string): TreeDataNode[] {
+  return depts.map((dept) => {
+    // 处理标题高亮
+    let title: React.ReactNode = dept.deptName;
+    if (searchValue && dept.deptName.toLowerCase().includes(searchValue.toLowerCase())) {
+      const regex = new RegExp(`(${searchValue.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi');
+      const parts = dept.deptName.split(regex);
+      title = (
+        <>
+          {parts.map((part, index) =>
+            regex.test(part) ? (
+              <span key={index} style={{ backgroundColor: '#ffd54f', padding: '0 2px', borderRadius: 2 }}>
+                {part}
+              </span>
+            ) : (
+              <span key={index}>{part}</span>
+            )
+          )}
+        </>
+      );
     }
-  }
 
-  return result;
+    return {
+      key: dept.id!,
+      title,
+      children: dept.children ? convertToTreeData(dept.children, searchValue) : undefined,
+      isLeaf: !dept.children || dept.children.length === 0,
+      // 停用的部门显示为灰色
+      disabled: dept.status === DeptStatusEnum.DISABLE,
+    };
+  });
 }
 
 export default function DepartmentTree({ onSelect }: DepartmentTreeProps) {
   const [treeData, setTreeData] = useState<TreeDataNode[]>([]);
   const [loading, setLoading] = useState(false);
   const [selectedKey, setSelectedKey] = useState<string | undefined>();
+  const [searchValue, setSearchValue] = useState<string>("");
 
   // 保存原始树数据，用于搜索过滤
-  const originalTreeDataRef = useRef<TreeDataNode[]>([]);
+  const originalTreeDataRef = useRef<DeptVO[]>([]);
 
   // 加载部门树数据
   useEffect(() => {
@@ -80,8 +71,8 @@ export default function DepartmentTree({ onSelect }: DepartmentTreeProps) {
 
       // 将平铺结构转换为树形结构
       const treeData = buildDeptTree(data);
-      const convertedData = convertToTreeData(treeData);
-      originalTreeDataRef.current = convertedData;
+      originalTreeDataRef.current = treeData;
+      const convertedData = convertToTreeData(treeData, searchValue);
       setTreeData(convertedData);
     };
 
@@ -90,11 +81,20 @@ export default function DepartmentTree({ onSelect }: DepartmentTreeProps) {
 
   // 防抖搜索函数
   const performSearch = useCallback((value: string) => {
+    setSearchValue(value);
     if (!value) {
-      setTreeData(originalTreeDataRef.current);
+      // 清空搜索，显示原始数据
+      const convertedData = convertToTreeData(originalTreeDataRef.current);
+      setTreeData(convertedData);
     } else {
-      const filteredData = searchInTree(originalTreeDataRef.current, value);
-      setTreeData(filteredData);
+      // 使用公共的部门树搜索函数
+      const filteredData = searchDeptTree({
+        treeData: originalTreeDataRef.current,
+        searchValue: value,
+        nameField: "deptName",
+      });
+      const convertedData = convertToTreeData(filteredData, value);
+      setTreeData(convertedData);
     }
   }, []);
 
@@ -117,7 +117,18 @@ export default function DepartmentTree({ onSelect }: DepartmentTreeProps) {
 
     if (key) {
       const deptId = parseInt(key, 10);
-      const deptName = info.node.title as string;
+      // 从原始数据中查找部门名称
+      const findDeptName = (depts: DeptVO[], id: number): string | undefined => {
+        for (const dept of depts) {
+          if (dept.id === id) return dept.deptName;
+          if (dept.children) {
+            const found = findDeptName(dept.children, id);
+            if (found) return found;
+          }
+        }
+        return undefined;
+      };
+      const deptName = findDeptName(originalTreeDataRef.current, deptId) || "";
       onSelect(deptId, deptName);
     } else {
       onSelect(undefined, "全部用户");
