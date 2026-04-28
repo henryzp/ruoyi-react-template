@@ -9,7 +9,7 @@ import {
   type DeptVO,
   DeptStatusEnum,
 } from "./api";
-import { buildDeptTree } from "@/utils/helper";
+import { buildTree } from "@/utils/helper";
 
 interface EditModalProps {
   visible: boolean;
@@ -54,7 +54,7 @@ export default function EditModal({
       }
 
       // 构建树形结构并转换为 TreeSelect 需要的格式
-      const treeData = buildDeptTree(data);
+      const treeData = buildTree(data);
       const convertedData = convertToTreeSelectData(treeData);
       // 添加一个顶级选项"无父部门"
       setDeptTreeData([
