@@ -195,7 +195,8 @@ export function buildTree<
         // 只有当原 item 有 children 属性时才创建新对象
         const itemWithChildren = item as any;
         if (itemWithChildren.children !== undefined) {
-          const { children: _removed, ...rest } = itemWithChildren;
+          const rest = { ...itemWithChildren };
+          delete rest.children;
           result.push(rest as T);
         } else {
           result.push(item);
@@ -333,4 +334,3 @@ export function searchTree<
 
   return buildTree(0);
 }
-

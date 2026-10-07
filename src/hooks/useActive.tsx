@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useMemo } from "react";
 import { useLocation } from "react-router-dom";
 import { useAppStore } from "@/store/appStore";
 
@@ -51,26 +51,14 @@ const useActive = (
   const isFirsted = useRef(false);
   const activeDepsRecord = useRef(activeDeps);
 
-  // 依赖变化时重置状态
-  let depSignature = useRef<string>(Date.now().toString());
-  if (
-    currentPath.current === location.pathname &&
-    activeTabKey === location.pathname &&
-    activeDepsRecord.current
-  ) {
-    const depsEqual =
-      JSON.stringify(activeDepsRecord.current) === JSON.stringify(activeDeps);
-    depSignature.current = depsEqual
-      ? depSignature.current
-      : Date.now().toString();
-
-    // 如果已经创建过，并且依赖变化了，重置状态
-    if (isFirsted.current && !depsEqual) {
+  const depsSignature = useMemo(() => JSON.stringify(activeDeps ?? []), [activeDeps]);
+  useEffect(() => {
+    if (isFirsted.current && JSON.stringify(activeDepsRecord.current ?? []) !== depsSignature) {
       activeDepsRecord.current = activeDeps;
       isFirsted.current = false;
       activeFlag.current = undefined;
     }
-  }
+  }, [activeDeps, depsSignature]);
 
   useEffect(() => {
     if (
@@ -100,7 +88,7 @@ const useActive = (
     };
   }, [
     activeTabKey,
-    depSignature.current,
+    depsSignature,
     onActive,
     onFirstActive,
     onLastLeave,

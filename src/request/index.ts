@@ -2,6 +2,12 @@ import axios, { type AxiosResponse, type AxiosError } from "axios";
 import type { BackendResultFormat, RequestConfig } from "./types";
 import { message } from "antd";
 import { getToken, getRefreshToken, clearAuth } from "@/store/authStore";
+
+export type {
+  BackendResultFormat,
+  RequestConfig,
+  ResultFormat,
+} from "./types";
 import {
   TOKEN_KEY,
   REFRESH_TOKEN_KEY,
@@ -30,7 +36,7 @@ let requestList: Array<(token: string) => void> = [];
 /**
  * 处理 401 错误：刷新 token 并重试请求
  */
-async function handle401Error(error: any, config?: any): Promise<any> {
+async function handle401Error(_error: any, config?: any): Promise<any> {
   // 如果正在刷新 token，将请求加入队列
   if (isRefreshing) {
     return new Promise((resolve) => {

@@ -131,43 +131,39 @@ export const useAuthStore = create<AuthStore>()(
 
       // 获取用户信息
       getUserInfo: async () => {
-        try {
-          // 调用获取权限信息接口（返回 user、roles、permissions、menus）
-          const response = await request<{
-            user: any;
-            roles: string[];
-            permissions: string[];
-            menus: any[];
-          }>({
-            url: "/system/auth/get-permission-info",
-            method: "GET",
-          });
+        // 调用获取权限信息接口（返回 user、roles、permissions、menus）
+        const response = await request<{
+          user: any;
+          roles: string[];
+          permissions: string[];
+          menus: any[];
+        }>({
+          url: "/system/auth/get-permission-info",
+          method: "GET",
+        });
 
-          // 构造 UserInfo 对象
-          const userInfo: any = {
-            ...response.user,
-            roles: response.roles,
-            permissions: response.permissions,
-            menus: response.menus,
-          };
+        // 构造 UserInfo 对象
+        const userInfo: any = {
+          ...response.user,
+          roles: response.roles,
+          permissions: response.permissions,
+          menus: response.menus,
+        };
 
-          get().setUserInfo(userInfo);
-          // 标记用户信息已初始化，防止 Guard 组件重复请求
-          set({ isUserInfoInitialized: true });
+        get().setUserInfo(userInfo);
+        // 标记用户信息已初始化，防止 Guard 组件重复请求
+        set({ isUserInfoInitialized: true });
 
-          // 保存用户信息缓存（包含权限和菜单）
-          if (userInfo.menus) {
-            localStorage.setItem(
-              MENUS_CACHE_KEY,
-              JSON.stringify(userInfo.menus),
-            );
-          }
-          localStorage.setItem(USER_CACHE_KEY, JSON.stringify(userInfo));
-
-          return userInfo;
-        } catch (error) {
-          throw error;
+        // 保存用户信息缓存（包含权限和菜单）
+        if (userInfo.menus) {
+          localStorage.setItem(
+            MENUS_CACHE_KEY,
+            JSON.stringify(userInfo.menus),
+          );
         }
+        localStorage.setItem(USER_CACHE_KEY, JSON.stringify(userInfo));
+
+        return userInfo;
       },
 
       // 初始化用户信息和权限（类似 hr-front 的 setUserInfoAction）
@@ -189,7 +185,8 @@ export const useAuthStore = create<AuthStore>()(
           set({ isInitializing: true });
 
           // 调用 getUserInfo 获取最新的权限信息
-          const result = await get().getUserInfo();
+          await get().getUserInfo();
+          set({ isAuthenticated: true });
 
           return true;
         } catch (error: any) {

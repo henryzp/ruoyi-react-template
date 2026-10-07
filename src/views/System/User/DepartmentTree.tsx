@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Input, Tree, Spin, message } from "antd";
 import type { TreeDataNode, TreeProps } from "antd";
 import { SearchOutlined } from "@ant-design/icons";
@@ -106,12 +106,8 @@ export default function DepartmentTree({ onSelect }: DepartmentTreeProps) {
     return highlightText(node.deptName, highlightKeyword);
   };
 
-  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    // 输入时不做任何处理，只更新输入框的值
-  };
-
   // 处理树节点选择
-  const handleSelect: TreeProps["onSelect"] = (selectedKeys, info) => {
+  const handleSelect: TreeProps["onSelect"] = (selectedKeys) => {
     const key = selectedKeys[0] as string | undefined;
     setSelectedKey(key);
 

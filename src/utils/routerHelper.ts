@@ -45,7 +45,7 @@ export class RouterHelper {
    * 递归渲染路由（用于 react-router 的 RouteObject）
    */
   public toRenderRouteLoop(routeItem: RouteItem): RouteObject {
-    const route: RouteObject = {
+    const route: RouteObject & { redirect?: string } = {
       path: routeItem.path,
       id: routeItem.id,
     };
@@ -60,8 +60,8 @@ export class RouterHelper {
       if (typeof routeItem.component === "function") {
         // 如果是懒加载函数，包装在 Suspense 中
         route.element = createElement(
-          routeItem.component as ComponentType,
-          routeItem.props,
+          routeItem.component as ComponentType<Record<string, any>>,
+          routeItem.props as Record<string, any>,
         );
       } else {
         // 如果是 ReactNode，直接使用

@@ -17,12 +17,13 @@ export enum MenuTypeEnum {
 /**
  * 显示状态枚举
  */
-export enum VisibleEnum {
+export const VisibleEnum = {
   /** 显示 */
-  SHOW = true,
+  SHOW: true,
   /** 隐藏 */
-  HIDE = false,
-}
+  HIDE: false,
+} as const;
+export type VisibleEnum = (typeof VisibleEnum)[keyof typeof VisibleEnum];
 
 /**
  * 是否缓存枚举

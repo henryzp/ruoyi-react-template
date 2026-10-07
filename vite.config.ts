@@ -4,10 +4,13 @@ import path from 'path'
 import { codeInspectorPlugin } from 'code-inspector-plugin'
 
 // https://vite.dev/config/
-export default defineConfig({
+export default defineConfig(({ mode }) => ({
   plugins: [react(), codeInspectorPlugin({ bundler: 'vite' })],
   resolve: {
     alias: {
+      ...(mode === 'mock' || mode === 'hybrid'
+        ? { '@/request': path.resolve(__dirname, './src/mocks/request.ts') }
+        : {}),
       '@': path.resolve(__dirname, './src'),
     },
   },
@@ -21,4 +24,4 @@ export default defineConfig({
       },
     },
   },
-})
+}))

@@ -24,7 +24,6 @@ export function Guard({
   const navigate = useNavigate();
   const location = useLocation();
   const {
-    isAuthenticated,
     isUserInfoInitialized,
     isInitializing,
     initUserInfo,

@@ -37,7 +37,6 @@ export default function Menu() {
   const [filteredMenuList, setFilteredMenuList] = useState<MenuVO[]>([]);
   const [highlightKeyword, setHighlightKeyword] = useState("");
   const [expandedRowKeys, setExpandedRowKeys] = useState<React.Key[]>([]);
-  const tableContainerRef = useRef<HTMLDivElement>(null);
   const searchInputRef = useRef<any>(null);
 
   // 编辑弹窗状态
@@ -45,7 +44,7 @@ export default function Menu() {
   const [editMenuId, setEditMenuId] = useState<number | undefined>(undefined);
 
   // 计算表格内容区高度
-  const tableScrollY = useCalcTableHeight(tableContainerRef);
+  const { tableRef, tableScrollY } = useCalcTableHeight();
 
   // 获取所有有子节点的菜单ID
   // 注意：这是递归函数，不能用 useCallback 包装
@@ -321,7 +320,7 @@ export default function Menu() {
 
       {/* 数据表格 */}
       <div
-        ref={tableContainerRef}
+        ref={tableRef}
         style={{ flex: 1, overflow: "hidden" }}
       >
         <Table

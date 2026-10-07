@@ -1,0 +1,46 @@
+.dictionary-data-modal {
+  .ant-modal-content {
+    display: flex;
+    max-height: calc(100vh - 48px);
+    flex-direction: column;
+  }
+  .ant-modal-header {
+    flex: none;
+  }
+  .ant-modal-body {
+    display: flex;
+    min-height: 0;
+    flex: 1;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  .dictionary-modal-title {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    padding-right: 48px;
+  }
+  .dictionary-filter {
+    flex: none;
+    padding: 16px;
+    margin-bottom: 16px;
+    background: #f7f9fc;
+    border-radius: 8px;
+  }
+  .dictionary-table-container {
+    min-height: 0;
+    flex: 1;
+    overflow: auto;
+  }
+}
+
+.dictionary-data-modal .dictionary-action-button.ant-btn {
+  box-shadow: none;
+
+  &:hover,
+  &:focus,
+  &:active {
+    box-shadow: none;
+  }
+}

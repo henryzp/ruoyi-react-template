@@ -1,0 +1,75 @@
+.header-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.header-utility-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  align-items: center;
+  min-width: 60px;
+  padding: 4px 6px;
+  color: #687895;
+  font-size: 14px;
+  line-height: 18px;
+  background: transparent;
+  border: 0;
+  border-radius: 6px;
+  cursor: pointer;
+  transition:
+    background 0.2s ease,
+    color 0.2s ease;
+}
+
+.header-utility-item > span:last-child {
+  font-size: 12px;
+  line-height: 16px;
+}
+
+.header-utility-item:hover {
+  color: #1e3c72;
+  background: #eef3fb;
+}
+
+.header-utility-icon {
+  font-size: 20px;
+  line-height: 24px;
+}
+
+.header-profile-divider {
+  width: 2px;
+  height: 24px;
+  background: #dbe4f2;
+}
+
+.header-profile-button {
+  display: flex;
+  height: 40px;
+  padding: 0 8px;
+  align-items: center;
+}
+
+.header-profile-button .ant-avatar {
+  color: #ffffff;
+  background: #1e3c72;
+}
+
+.header-profile-copy {
+  display: flex;
+  margin-left: 8px;
+  flex-direction: column;
+  align-items: flex-start;
+  line-height: 18px;
+}
+
+.header-profile-copy strong {
+  color: #1e3c72;
+  font-size: 14px;
+}
+
+.header-profile-copy span {
+  color: #999;
+  font-size: 12px;
+}

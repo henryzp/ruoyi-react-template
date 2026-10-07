@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useState } from "react";
 import { Form, Button, Table, message, Popconfirm, Modal } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import {
@@ -51,7 +51,6 @@ const SEARCH_FORM_ITEMS: SearchFormItem[] = [
 
 export default function Post() {
   const [form] = Form.useForm();
-  const tableContainerRef = useRef<HTMLDivElement>(null);
   const [exportLoading, setExportLoading] = useState(false);
 
   // 编辑弹窗状态
@@ -59,10 +58,10 @@ export default function Post() {
   const [editPostId, setEditPostId] = useState<number | undefined>(undefined);
 
   // 计算表格内容区高度
-  const tableScrollY = useCalcTableHeight(tableContainerRef);
+  const { tableRef, tableScrollY } = useCalcTableHeight();
 
   // 使用 useTable hook
-  const tableProps = useTable<true>({
+  const tableProps = useTable<true, PostVO>({
     fetchData: async (pagination) => {
       // 获取搜索表单的值
       const formValues = form.getFieldsValue();
@@ -263,7 +262,7 @@ export default function Post() {
 
       {/* 数据表格 */}
       <div
-        ref={tableContainerRef}
+        ref={tableRef}
         style={{
           marginTop: 16,
           height: "calc(100% - 64px)",

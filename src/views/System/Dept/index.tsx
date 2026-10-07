@@ -23,7 +23,6 @@ export default function Dept() {
   const [highlightKeyword, setHighlightKeyword] = useState(""); // 只用于高亮显示
   const [expandedRowKeys, setExpandedRowKeys] = useState<React.Key[]>([]);
   const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([]);
-  const tableContainerRef = useRef<HTMLDivElement>(null);
   const searchInputRef = useRef<any>(null);
 
   // 编辑弹窗状态
@@ -31,7 +30,7 @@ export default function Dept() {
   const [editDeptId, setEditDeptId] = useState<number | undefined>(undefined);
 
   // 计算表格内容区高度
-  const tableScrollY = useCalcTableHeight(tableContainerRef);
+  const { tableRef, tableScrollY } = useCalcTableHeight();
 
   // 获取所有有子节点的部门ID
   const getParentIds = (depts: DeptVO[]): number[] => {
@@ -375,7 +374,7 @@ export default function Dept() {
 
       {/* 数据表格 */}
       <div
-        ref={tableContainerRef}
+        ref={tableRef}
         style={{ flex: 1, overflow: "hidden" }}
       >
         <Table

@@ -1,4 +1,5 @@
-import React, { RefObject, memo, useEffect, useMemo, useRef } from "react";
+import React, { memo, useEffect, useMemo, useState } from "react";
+import type { RefObject } from "react";
 import { createPortal } from "react-dom";
 
 export type KeepAliveComponentProps = React.PropsWithChildren<{
@@ -7,7 +8,7 @@ export type KeepAliveComponentProps = React.PropsWithChildren<{
   pageKey: string;
 }>;
 
-function keepAliveRoute(props: KeepAliveComponentProps) {
+function KeepAliveRoute(props: KeepAliveComponentProps) {
   const { parentDomRef, activeKey, children, pageKey } = props;
   const isActive = activeKey === pageKey;
 
@@ -20,11 +21,7 @@ function keepAliveRoute(props: KeepAliveComponentProps) {
   }, [pageKey]);
 
   // 标记组件是否已经被挂载过
-  const isAliveRef = useRef(false);
-
-  if (isActive && !isAliveRef.current) {
-    isAliveRef.current = isActive;
-  }
+  const [isAlive, setIsAlive] = useState(false);
 
   useEffect(() => {
     const containerDiv = parentDomRef.current;
@@ -33,6 +30,7 @@ function keepAliveRoute(props: KeepAliveComponentProps) {
     }
 
     if (isActive) {
+      setIsAlive(true);
       // 激活时：将容器挂载到主容器
       // 先移除之前激活的容器
       const oldDom = containerDiv.querySelector("[data-page-name]");
@@ -51,11 +49,11 @@ function keepAliveRoute(props: KeepAliveComponentProps) {
   }, [isActive, aliveDom, parentDomRef, pageKey, activeKey]);
 
   // 只有被激活过的组件才通过 Portal 渲染
-  if (!isAliveRef.current) {
+  if (!isAlive) {
     return null;
   }
 
   return createPortal(children, aliveDom, pageKey);
 }
 
-export default memo(keepAliveRoute);
+export default memo(KeepAliveRoute);

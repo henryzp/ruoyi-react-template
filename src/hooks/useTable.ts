@@ -1,320 +1,244 @@
-import type { PaginationProps } from "antd";
-import { useEffect, useState, useRef } from "react";
+import type { Key, MouseEvent } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import type { PaginationProps, TableProps } from 'antd';
 
-function getRemainList(allList: any[], subList: any[], key: string) {
-  //1-遍历大数组
-  const arr: any[] = [];
-  allList.forEach((item) => {
-    //2-起一个变量判断小数组中是否有大数组中的某一个元素，如果有则该值为true 如果没有 则该值为false
-    let flag = false;
-    //3-遍历小数组
-    subList.forEach((item1) => {
-      if (item1[key] === item[key]) {
-        flag = true;
-      }
-    });
-    if (flag === false) {
-      arr.push(item);
-    }
-  });
-  return arr;
-}
-
-/**
- * 检查是否是交互式元素或其父节点
- * 如果遇到<tr> 或 <td> 元素则停止递归
- * @param element 当前点击的元素
- */
-const isInteractiveElement = (element: HTMLElement | null): boolean => {
-  if (!element) return false;
-
-  const tagName = element.tagName.toLowerCase();
-
-  // 停止递归条件：遇到<tr>或<td>时，不再继续向上递归
-  if (tagName === "tr" || tagName === "td") {
-    return false;
-  }
-
-  // 判断是否是交互性元素
-  if (
-    tagName === "button" ||
-    tagName === "a" ||
-    tagName === "input" ||
-    tagName === "textarea" ||
-    tagName === "select" ||
-    element.getAttribute("role") === "button" ||
-    element.getAttribute("data-stop-propagation") === "true" || // 自定义属性
-    element.classList.contains("no-row-click") // 特定的 CSS 类名
-  ) {
-    return true;
-  }
-
-  // 递归检查父元素，直到 <tr> 或 <td>
-  return isInteractiveElement(element.parentElement);
-};
-
-interface TablePropsBase {
-  handleFetchData: (args: { resetPageNo?: boolean }) => void;
+type Result<T> = { records: T[]; size: number; current: number; total: number };
+type FetchResult<T> = { err?: unknown; data?: Result<T> };
+type Page = { pageNo: number; pageSize: number; total: number };
+type Base<T> = {
   loading: boolean;
-  dataSource: any[];
+  dataSource: T[];
   pagination: PaginationProps;
+  handleFetchData: (args: { resetPageNo?: boolean }) => Promise<void>;
   rowKey: string;
-}
-
-interface TablePropsWithSelection extends TablePropsBase {
-  rowSelection: any;
-  onRow: any;
-  selectedRows: any[];
+};
+type Selected<T> = {
+  selectedRows: T[];
+  rowSelection: TableProps<T>['rowSelection'];
+  onRow: TableProps<T>['onRow'];
   resetSelectRowKeysFn: () => void;
-}
-
-interface TablePropsWithoutSelection extends TablePropsBase {
-  rowSelection?: any;
-  onRow?: any;
-  selectedRows?: any[];
-  resetSelectRowKeysFn?: () => void;
-}
-
-type MyTableProps<T> = T extends true
-  ? TablePropsWithSelection
-  : TablePropsWithoutSelection;
-
-export default <T extends boolean = false>(props: {
+};
+type Props<T> = {
   fetchData: (
-    pagination: { pageNo: number; pageSize: number; total: number },
+    pagination: Page,
     resetPageNo?: boolean,
-  ) => Promise<any>;
+  ) => Promise<FetchResult<T>>;
   hasRowSelection?: boolean;
   resetSelectRowKeys?: boolean;
-  defaultSelectedRows?: any[];
+  defaultSelectedRows?: T[];
   rowKey?: string;
   hasFetchAuth?: boolean;
-  defaultPagination?: {
-    pageSize?: number;
-    pageNo?: number;
-  };
-  rowSelectionType?: "checkbox" | "radio";
-  extraDependencies?: any[];
+  defaultPagination?: { pageSize?: number; pageNo?: number };
+  rowSelectionType?: 'checkbox' | 'radio';
+  extraDependencies?: readonly unknown[];
   defaultPageSizeOptions?: string[];
-}): MyTableProps<T> => {
+};
+
+const DEFAULT_PAGE = { pageSize: 10, pageNo: 1 };
+const DEFAULT_OPTIONS = ['10', '20', '50', '100'];
+const INTERACTIVE =
+  'button,a,input,textarea,select,[role="button"],[data-stop-propagation="true"],.no-row-click';
+const isInteractiveElement = (target: EventTarget | null) => {
+  if (!(target instanceof Element)) return false;
+  const cell = target.closest('td,th');
+  if (!cell) return false;
+  const found = target.closest(INTERACTIVE);
+  return Boolean(found && cell.contains(found));
+};
+
+export default function useTable<
+  HasSelection extends boolean = false,
+  T = Record<string, unknown>,
+>(
+  props: Props<T>,
+): Base<T> & (HasSelection extends true ? Selected<T> : Partial<Selected<T>>) {
   const {
     fetchData,
     hasRowSelection = false,
     resetSelectRowKeys = true,
     defaultSelectedRows = [],
-    rowKey = "id",
+    rowKey = 'id',
     hasFetchAuth = true,
-    defaultPagination = {
-      pageSize: 10,
-      pageNo: 1,
-    },
-    defaultPageSizeOptions = ["10", "20", "50", "100"],
-    rowSelectionType = "checkbox",
+    defaultPagination = DEFAULT_PAGE,
+    defaultPageSizeOptions = DEFAULT_OPTIONS,
+    rowSelectionType = 'checkbox',
     extraDependencies = [],
   } = props;
-
+  const fetchRef = useRef(fetchData);
+  fetchRef.current = fetchData;
   const [loading, setLoading] = useState(false);
-  const [dataSource, setDataSource] = useState([]);
-  const [pagination, setPagination] = useState({
+  const [dataSource, setDataSource] = useState<T[]>([]);
+  const [page, setPage] = useState<Page>({
+    ...DEFAULT_PAGE,
     ...defaultPagination,
     total: 0,
   });
-  const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>(
-    defaultSelectedRows.map((item) => item[rowKey]),
+  const pageRef = useRef(page);
+  pageRef.current = page;
+  const dependencySnapshot = useRef<readonly unknown[]>(extraDependencies);
+  const dependencyVersion = useRef(0);
+  if (
+    dependencySnapshot.current.length !== extraDependencies.length ||
+    extraDependencies.some(
+      (item, index) => !Object.is(item, dependencySnapshot.current[index]),
+    )
+  ) {
+    dependencySnapshot.current = extraDependencies;
+    dependencyVersion.current += 1;
+  }
+  const [selectedRows, setSelectedRows] = useState<T[]>(defaultSelectedRows);
+  const sequence = useRef(0);
+  const mounted = useRef(true);
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+    };
+  }, []);
+  const handleFetchData = useCallback(
+    async ({ resetPageNo }: { resetPageNo?: boolean }) => {
+      if (resetPageNo && pageRef.current.pageNo !== 1) {
+        sequence.current += 1;
+        setPage((current) => ({ ...current, pageNo: 1 }));
+        return;
+      }
+      const id = ++sequence.current;
+      setLoading(true);
+      if (hasRowSelection && resetSelectRowKeys) setSelectedRows([]);
+      try {
+        const result = await fetchRef.current(pageRef.current, resetPageNo);
+        if (id !== sequence.current || !mounted.current) return;
+        const resultData = result.data;
+        if (!result.err && resultData) {
+          const pageSize = resultData.size > 0 ? resultData.size : 1;
+          const lastPage = Math.max(1, Math.ceil(resultData.total / pageSize));
+          const effectivePage = Math.min(resultData.current, lastPage);
+          setDataSource(resultData.records);
+          setPage((p) => ({
+            ...p,
+            pageSize: resultData.size,
+            pageNo: effectivePage,
+            total: resultData.total,
+          }));
+        }
+      } finally {
+        if (id === sequence.current && mounted.current) setLoading(false);
+      }
+    },
+    [hasRowSelection, resetSelectRowKeys],
   );
-  const [selectedRows, setSelectedRows] = useState<any[]>(defaultSelectedRows);
-
-  // 防止重复请求的标志 - 使用 Ref 避免被重新渲染重置
-  const isFetchingRef = useRef(false);
-  const lastFetchTimeRef = useRef(0);
-  const INITIAL_FETCH_DEBOUNCE = 1000; // 防止初始重复请求的时间窗口（毫秒）
-
-  const handleFetchData = async ({
-    resetPageNo,
-  }: {
-    resetPageNo?: boolean;
-  }) => {
-    const now = Date.now();
-    const timeSinceLastFetch = now - lastFetchTimeRef.current;
-
-    // 防止短时间内重复请求
-    // 如果正在请求，或者距离上次请求时间太短（小于 100ms），则跳过
-    // 或者是初始加载时的重复请求（小于 1000ms 且页码未变）
-    const isInitialDuplicate =
-      timeSinceLastFetch < INITIAL_FETCH_DEBOUNCE &&
-      timeSinceLastFetch > 0 &&
-      pagination.pageNo === 1 &&
-      pagination.pageSize === 10;
-
-    if (
-      isFetchingRef.current ||
-      timeSinceLastFetch < 100 ||
-      isInitialDuplicate
-    ) {
+  const selectedKeys = useMemo(
+    () => selectedRows.map((row) => row[rowKey as keyof T] as Key),
+    [selectedRows, rowKey],
+  );
+  const onSelect = useCallback(
+    (record: T, selected: boolean) =>
+      setSelectedRows((rows) => {
+        if (rowSelectionType === 'radio') return selected ? [record] : [];
+        const isOtherRow = (row: T) =>
+          row[rowKey as keyof T] !== record[rowKey as keyof T];
+        return selected
+          ? [...rows.filter(isOtherRow), record]
+          : rows.filter(isOtherRow);
+      }),
+    [rowKey, rowSelectionType],
+  );
+  const rowSelection = useMemo<TableProps<T>['rowSelection']>(
+    () =>
+      hasRowSelection
+        ? {
+            type: rowSelectionType,
+            fixed: true,
+            selectedRowKeys: selectedKeys,
+            onSelect,
+            onSelectAll: (selected, rows, changeRows) =>
+              setSelectedRows((current) => {
+                const valid = (selected ? rows : changeRows).filter(Boolean);
+                if (selected) {
+                  const merged = new Map<Key, T>(
+                    current.map((row) => [row[rowKey as keyof T] as Key, row]),
+                  );
+                  valid.forEach((row) =>
+                    merged.set(row[rowKey as keyof T] as Key, row),
+                  );
+                  return [...merged.values()];
+                }
+                const removed = new Set(
+                  valid.map((row) => row[rowKey as keyof T] as Key),
+                );
+                return current.filter(
+                  (row) => !removed.has(row[rowKey as keyof T] as Key),
+                );
+              }),
+          }
+        : undefined,
+    [hasRowSelection, onSelect, rowKey, rowSelectionType, selectedKeys],
+  );
+  const onRow = useMemo<TableProps<T>['onRow']>(
+    () =>
+      hasRowSelection
+        ? (record) => ({
+            onClick: (event: MouseEvent) => {
+              if (!isInteractiveElement(event.target))
+                onSelect(
+                  record,
+                  rowSelectionType === 'radio' ||
+                    !selectedKeys.includes(record[rowKey as keyof T] as Key),
+                );
+            },
+          })
+        : undefined,
+    [hasRowSelection, onSelect, rowKey, rowSelectionType, selectedKeys],
+  );
+  const extraDependenciesVersion = dependencyVersion.current;
+  const previousExtraDependenciesVersion = useRef(extraDependenciesVersion);
+  useEffect(() => {
+    const dependenciesChanged =
+      previousExtraDependenciesVersion.current !== extraDependenciesVersion;
+    previousExtraDependenciesVersion.current = extraDependenciesVersion;
+    if (dependenciesChanged && page.pageNo !== 1) {
+      sequence.current += 1;
+      setPage((current) => ({ ...current, pageNo: 1 }));
       return;
     }
-
-    isFetchingRef.current = true;
-    lastFetchTimeRef.current = now;
-    setLoading(true);
-    if (hasRowSelection && resetSelectRowKeys) {
-      setSelectedRowKeys([]);
-      setSelectedRows([]);
-    }
-    // @ts-ignore
-    const { err, data } = await fetchData(pagination, resetPageNo);
-    if (!err) {
-      setDataSource(data.records);
-      setPagination({
-        pageSize: data.size,
-        pageNo: data.current,
-        total: data.total,
-      });
-    }
-    setLoading(false);
-    isFetchingRef.current = false;
-  };
-
-  let rowSelection = undefined;
-  let onRow = undefined;
-
-  const onSelectRow = (record: any, event: React.MouseEvent) => {
-    const target = event.target as HTMLElement;
-
-    // 如果点击的是交互性元素或者其中的子元素，则阻止冒泡
-    if (isInteractiveElement(target)) {
-      return; // 不触发行点击事件
-    }
-    if (rowSelectionType === "checkbox") {
-      const isSelected = selectedRowKeys.includes(record[rowKey]);
-      if (isSelected) {
-        // 如果已经选中，则过滤掉
-        setSelectedRowKeys(
-          selectedRowKeys.filter((key) => key !== record[rowKey]),
-        );
-        setSelectedRows(
-          selectedRows.filter((row) => row[rowKey] !== record[rowKey]),
-        );
-      } else {
-        // 如果未选中，则添加进选中的行
-        setSelectedRowKeys([...selectedRowKeys, record[rowKey]]);
-        setSelectedRows([...selectedRows, record]);
-      }
-    } else {
-      setSelectedRowKeys([record[rowKey]]);
-      setSelectedRows([record]);
-    }
-  };
-
-  if (hasRowSelection) {
-    rowSelection = {
-      type: rowSelectionType,
-      fixed: true,
-      selectedRowKeys,
-      onSelect: (record: any, selected: boolean) => {
-        if (rowSelectionType === "checkbox") {
-          if (selected) {
-            setSelectedRowKeys([...selectedRowKeys, record[rowKey]]);
-            setSelectedRows([...selectedRows, record]);
-          } else {
-            setSelectedRowKeys(
-              selectedRowKeys.filter((item) => item !== record[rowKey]),
-            );
-            setSelectedRows(
-              selectedRows.filter((item) => item[rowKey] !== record[rowKey]),
-            );
-          }
-        } else {
-          setSelectedRowKeys([record[rowKey]]);
-          setSelectedRows([record]);
-        }
-      },
-      onSelectAll: (
-        selected: any,
-        newSelectedRows: any[],
-        changeRows: any[],
-      ) => {
-        if (selected) {
-          const arr = [
-            ...selectedRows,
-            ...newSelectedRows.filter((item) => !!item),
-          ];
-          const uniqueArr = arr.filter(
-            (item, index) =>
-              arr.findIndex((i) => i[rowKey] === item[rowKey]) === index,
-          );
-          setSelectedRowKeys(uniqueArr.map((item) => item[rowKey]));
-          setSelectedRows(uniqueArr);
-        } else {
-          const diffSelectedRows = changeRows.filter((item) => !!item);
-          const arr = getRemainList(selectedRows, diffSelectedRows, rowKey);
-          setSelectedRowKeys(arr.map((item) => item[rowKey]));
-          setSelectedRows(arr);
-        }
-      },
-    };
-    onRow = (record: any) => ({
-      onClick: (event: React.MouseEvent) => onSelectRow(record, event),
-    });
-  }
-
-  useEffect(() => {
-    if (hasFetchAuth) {
-      handleFetchData({});
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    if (hasFetchAuth) handleFetchData({}).catch(() => undefined);
   }, [
-    pagination.pageNo,
-    pagination.pageSize,
     hasFetchAuth,
-    ...extraDependencies,
+    handleFetchData,
+    page.pageNo,
+    page.pageSize,
+    extraDependenciesVersion,
   ]);
-
-  const resetSelectRowKeysFn = () => {
-    setSelectedRowKeys([]);
-    setSelectedRows([]);
-  };
-
-  const commonResultProps: TablePropsBase = {
-    loading,
-    dataSource,
-    pagination: {
-      pageSize: pagination.pageSize,
-      current: pagination.pageNo,
-      total: pagination.total,
+  const pagination = useMemo<PaginationProps>(
+    () => ({
+      pageSize: page.pageSize,
+      current: page.pageNo,
+      total: page.total,
       showSizeChanger: true,
       showQuickJumper: true,
       pageSizeOptions: defaultPageSizeOptions,
       showTotal: (total) => `共 ${total} 条`,
-      onChange: (page) => {
-        setPagination({
-          ...pagination,
-          pageNo: page,
-        });
+      onChange: (current, size) => {
+        if (size !== page.pageSize) setDataSource([]);
+        setPage((p) => ({
+          ...p,
+          pageNo: size !== p.pageSize ? 1 : current,
+          pageSize: size,
+        }));
       },
-      onShowSizeChange: (current, size) => {
-        setTimeout(() => {
-          setPagination({
-            ...pagination,
-            pageNo: 1,
-            pageSize: size,
-          });
-        }, 200);
-      },
-    },
+    }),
+    [defaultPageSizeOptions, page],
+  );
+  const resetSelectRowKeysFn = useCallback(() => setSelectedRows([]), []);
+  return {
+    loading,
+    dataSource,
+    pagination,
     handleFetchData,
     rowKey,
-  };
-
-  if (hasRowSelection) {
-    return {
-      ...commonResultProps,
-      selectedRows,
-      rowSelection,
-      onRow,
-      resetSelectRowKeysFn,
-    } as MyTableProps<T>;
-  } else {
-    return commonResultProps as MyTableProps<T>;
-  }
-};
+    ...(hasRowSelection
+      ? { selectedRows, rowSelection, onRow, resetSelectRowKeysFn }
+      : {}),
+  } as Base<T> &
+    (HasSelection extends true ? Selected<T> : Partial<Selected<T>>);
+}

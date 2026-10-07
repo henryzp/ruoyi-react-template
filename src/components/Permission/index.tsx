@@ -1,4 +1,5 @@
-import { ReactElement, ReactNode, cloneElement, isValidElement } from "react";
+import { isValidElement } from "react";
+import type { ReactNode } from "react";
 import {
   useHasPermission,
   useHasRole,
@@ -52,15 +53,9 @@ export function Permission({
 }: PermissionProps) {
   // 检查登录状态
   const isAuthenticated = useIsAuthenticated();
-  if (requireAuth && !isAuthenticated) {
-    return <>{fallback}</>;
-  }
-
-  // 检查权限
-  const hasPermission = permission ? useHasPermission(permission) : true;
-
-  // 检查角色
-  const hasRole = role ? useHasRole(role) : true;
+  const hasPermission = useHasPermission(permission ?? []);
+  const hasRole = useHasRole(role ?? []);
+  if (requireAuth && !isAuthenticated) return <>{fallback}</>;
 
   // 如果没有权限，返回回退内容
   if (!hasPermission || !hasRole) {
@@ -82,9 +77,9 @@ export function withPermission<P extends object>(
   Component: React.ComponentType<P>,
   props: Omit<PermissionProps, "children">,
 ) {
-  return (props: P) => (
+  return (_props: P) => (
     <Permission {...props}>
-      <Component {...props} />
+      <Component {..._props} />
     </Permission>
   );
 }
