@@ -11,10 +11,7 @@ import { resolveRouterMode } from "@/router/mode";
 import { createLoginRedirectUrl } from "@/utils/authRedirect";
 
 export type { BackendResultFormat, RequestConfig, ResultFormat } from "./types";
-import {
-  TENANT_ID_KEY,
-  VISIT_TENANT_ID_KEY,
-} from "@/types/auth";
+import { TENANT_ID_KEY, VISIT_TENANT_ID_KEY } from "@/types/auth";
 
 /**
  * 创建 axios 实例
@@ -56,14 +53,19 @@ instance.interceptors.request.use(
 );
 
 const routerMode = resolveRouterMode(
-  (import.meta.env as ImportMetaEnv & {
-    readonly VITE_ROUTER_MODE?: string;
-  }).VITE_ROUTER_MODE,
+  (
+    import.meta.env as ImportMetaEnv & {
+      readonly VITE_ROUTER_MODE?: string;
+    }
+  ).VITE_ROUTER_MODE,
   import.meta.env.MODE,
 );
 
 const redirectToLogin = () => {
-  window.location.href = createLoginRedirectUrl(routerMode, window.location.href);
+  window.location.href = createLoginRedirectUrl(
+    routerMode,
+    window.location.href,
+  );
 };
 
 attachAuthRefreshInterceptors(instance, {

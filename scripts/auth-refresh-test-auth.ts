@@ -20,7 +20,10 @@ export const establishSession = (tokens: AuthTokens) => {
   emitAuthTestLifecycle("established");
   return globalThis.__authTestSessionId;
 };
-export const setAuthTokens = (tokens: AuthTokens, expectedSessionId?: string | null) => {
+export const setAuthTokens = (
+  tokens: AuthTokens,
+  expectedSessionId?: string | null,
+) => {
   if (expectedSessionId !== undefined && getSessionId() !== expectedSessionId) {
     return false;
   }
@@ -44,8 +47,8 @@ export const subscribeAuthLifecycle = (listener: (event: string) => void) => {
   return () => listeners.delete(listener);
 };
 export const emitAuthTestLifecycle = (event: string) => {
-  globalThis.__authTestSessionListeners?.forEach((listener: (value: string) => void) =>
-    listener(event),
+  globalThis.__authTestSessionListeners?.forEach(
+    (listener: (value: string) => void) => listener(event),
   );
 };
 export const clearAuth = (expectedSessionId?: string | null) => {

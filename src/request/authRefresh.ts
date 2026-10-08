@@ -33,7 +33,10 @@ interface AuthRefreshOptions {
   baseURL: string;
   timeout: number;
   refreshHeaders: () => Record<string, string>;
-  onUnauthorized: (message: string | undefined, sessionId: string | null) => boolean;
+  onUnauthorized: (
+    message: string | undefined,
+    sessionId: string | null,
+  ) => boolean;
 }
 
 class SessionChangedError extends Error {
@@ -137,10 +140,7 @@ export function attachAuthRefreshInterceptors(
       return data;
     } catch (error) {
       if (error instanceof SessionChangedError) throw error;
-      if (
-        getSessionId() !== sessionId ||
-        getRefreshToken() !== refreshToken
-      ) {
+      if (getSessionId() !== sessionId || getRefreshToken() !== refreshToken) {
         throw new SessionChangedError();
       }
       if (isExpiredRefreshError(error)) {
@@ -149,11 +149,7 @@ export function attachAuthRefreshInterceptors(
         const unauthorizedMessage = refreshResponse
           ? refreshResponse.data?.msg
           : (error as Error).message;
-        showUnauthorized(
-          unauthorizedMessage,
-          sessionId,
-          error,
-        );
+        showUnauthorized(unauthorizedMessage, sessionId, error);
       }
       throw error;
     }
@@ -186,7 +182,8 @@ export function attachAuthRefreshInterceptors(
     if (sessionId !== getSessionId()) {
       throw markAuthHandled(new SessionChangedError());
     }
-    if (options.onUnauthorized(message, sessionId)) isHandlingUnauthorized = true;
+    if (options.onUnauthorized(message, sessionId))
+      isHandlingUnauthorized = true;
     throw markAuthHandled(cause);
   };
 

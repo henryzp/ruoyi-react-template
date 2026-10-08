@@ -190,7 +190,10 @@ try {
     const clearCountBefore = globalThis.__authTestClearCount;
     const failed = await settleWithin(requestPair(nextPhase));
     assert.equal(refreshCalls, 1, `${nextPhase} uses one refresh request`);
-    assert.ok(failed.every(({ err }) => err), `all ${nextPhase} requests settle as errors`);
+    assert.ok(
+      failed.every(({ err }) => err),
+      `all ${nextPhase} requests settle as errors`,
+    );
     assert.equal(
       globalThis.__authTestClearCount - clearCountBefore,
       shouldClear ? 1 : 0,
@@ -234,7 +237,10 @@ try {
       startedOldRefresh = resolve;
     });
     setAuth("session-A", "access-A", "refresh-A");
-    const oldRequest = makeRequest({ url: `/resource/old-${oldResult}`, method: "GET" })();
+    const oldRequest = makeRequest({
+      url: `/resource/old-${oldResult}`,
+      method: "GET",
+    })();
     await settleWithin(oldRefreshStarted);
 
     setAuth("session-B", "access-B", "refresh-B");
@@ -242,7 +248,11 @@ try {
       makeRequest({ url: `/resource/new-${oldResult}`, method: "GET" })(),
     );
     assert.ok(!newRequest.err, "new session request refreshes independently");
-    assert.equal(refreshCalls, 2, "each session starts its own refresh request");
+    assert.equal(
+      refreshCalls,
+      2,
+      "each session starts its own refresh request",
+    );
     assert.equal(globalThis.__authTestToken, "access-B2");
     assert.equal(globalThis.__authTestRefreshToken, "refresh-B2");
 
