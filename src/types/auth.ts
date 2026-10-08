@@ -14,6 +14,8 @@ export interface LoginDto {
   code?: string;
   /** 验证码UUID */
   uuid?: string;
+  /** 滑块验证码一次性校验凭证（验证码开关启用时必需） */
+  captchaVerification?: string;
 }
 
 /**
@@ -26,8 +28,8 @@ export interface LoginResponse {
   refreshToken: string;
   /** 用户ID */
   userId?: number;
-  /** 过期时间（秒） */
-  expiresIn?: number;
+  /** 过期时间（Unix 毫秒） */
+  expiresTime?: number;
 }
 
 /**
@@ -57,7 +59,7 @@ export interface UserInfo {
   /** 菜单列表（路由数据） */
   menus?: any[];
   /** 创建时间 */
-  createTime?: string;
+  createTime?: number | string;
 }
 
 /**

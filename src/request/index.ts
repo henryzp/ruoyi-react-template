@@ -3,11 +3,7 @@ import type { BackendResultFormat, RequestConfig } from "./types";
 import { message } from "antd";
 import { getToken, getRefreshToken, clearAuth } from "@/store/authStore";
 
-export type {
-  BackendResultFormat,
-  RequestConfig,
-  ResultFormat,
-} from "./types";
+export type { BackendResultFormat, RequestConfig, ResultFormat } from "./types";
 import {
   TOKEN_KEY,
   REFRESH_TOKEN_KEY,
@@ -31,7 +27,10 @@ let isRefreshing = false;
 /**
  * 刷新 token 的请求列表
  */
-let requestList: Array<(token: string) => void> = [];
+let requestList: Array<{
+  resolve: (token: string) => void;
+  reject: (error: unknown) => void;
+}> = [];
 
 /**
  * 处理 401 错误：刷新 token 并重试请求
@@ -39,12 +38,15 @@ let requestList: Array<(token: string) => void> = [];
 async function handle401Error(_error: any, config?: any): Promise<any> {
   // 如果正在刷新 token，将请求加入队列
   if (isRefreshing) {
-    return new Promise((resolve) => {
-      requestList.push((newToken: string) => {
-        if (config?.headers) {
-          config.headers.Authorization = `Bearer ${newToken}`;
-        }
-        resolve(instance(config!));
+    return new Promise((resolve, reject) => {
+      requestList.push({
+        resolve: (newToken: string) => {
+          if (config?.headers) {
+            config.headers.Authorization = `Bearer ${newToken}`;
+          }
+          resolve(instance(config!));
+        },
+        reject,
       });
     });
   }
@@ -57,7 +59,7 @@ async function handle401Error(_error: any, config?: any): Promise<any> {
     isRefreshing = false;
 
     // 执行队列中的请求
-    requestList.forEach((callback) => callback(newToken));
+    requestList.forEach(({ resolve }) => resolve(newToken));
     requestList = [];
 
     // 重试当前请求
@@ -68,6 +70,7 @@ async function handle401Error(_error: any, config?: any): Promise<any> {
   } catch (refreshError) {
     // 刷新失败，清除认证信息并跳转登录页
     isRefreshing = false;
+    requestList.forEach(({ reject }) => reject(refreshError));
     requestList = [];
     clearAuth();
 
@@ -122,8 +125,9 @@ instance.interceptors.request.use(
     }
 
     // 注入租户信息（从 localStorage 或默认值）
-    const tenantId = localStorage.getItem(TENANT_ID_KEY) || "1";
-    const visitTenantId = localStorage.getItem(VISIT_TENANT_ID_KEY);
+    const storage = typeof localStorage === "undefined" ? null : localStorage;
+    const tenantId = storage?.getItem(TENANT_ID_KEY) || "1";
+    const visitTenantId = storage?.getItem(VISIT_TENANT_ID_KEY);
 
     if (tenantId && config.headers) {
       config.headers["Tenant-id"] = tenantId;
@@ -153,6 +157,15 @@ instance.interceptors.response.use(
   },
   async (error: AxiosError<BackendResultFormat>) => {
     const { response, config } = error;
+
+    // Hybrid owns HTTP 404 fallback; leave it to its caller without a toast.
+    if (
+      response?.status === 404 &&
+      (config as (typeof config & { __hybridRequest?: boolean }) | undefined)
+        ?.__hybridRequest
+    ) {
+      return Promise.reject(error);
+    }
 
     // 处理 401 未认证错误
     if (response?.status === 401 || response?.data?.code === 401) {
@@ -195,6 +208,7 @@ export class CodeNotZeroError extends Error {
 export interface RequestResult<T = any> {
   data: T | null;
   err: Error | null;
+  response?: AxiosResponse | null;
 }
 
 /**
@@ -262,12 +276,16 @@ interface MakeRequest {
  *   params: { pageNo: 1, pageSize: 10 },
  * });
  */
-export const makeRequest: MakeRequest = <T>(config: RequestConfig) => {
+const makeRequestInternal = <T>(config: RequestConfig, hybrid = false) => {
   return async (requestConfig?: Partial<RequestConfig>) => {
     // 合并配置
     const mergedConfig: RequestConfig = {
       ...config,
       ...requestConfig,
+      params: {
+        ...config.params,
+        ...requestConfig?.params,
+      },
       headers: {
         ...config.headers,
         ...requestConfig?.headers,
@@ -275,24 +293,51 @@ export const makeRequest: MakeRequest = <T>(config: RequestConfig) => {
     };
 
     try {
-      const response =
-        await instance.request<BackendResultFormat<T>>(mergedConfig);
+      let response: AxiosResponse<BackendResultFormat<T>>;
+      try {
+        const transportConfig = hybrid
+          ? { ...mergedConfig, __hybridRequest: true }
+          : mergedConfig;
+        response =
+          await instance.request<BackendResultFormat<T>>(transportConfig);
+      } catch (error) {
+        // Hybrid owns HTTP 404 fallback and retains the response for that decision.
+        if (hybrid && (error as AxiosError).response?.status === 404) {
+          return {
+            data: null,
+            err: error as Error,
+            response: (error as AxiosError).response,
+          };
+        }
+        throw error;
+      }
       const res = response.data;
+
+      if (mergedConfig.rawResponse) {
+        return { data: res as T, err: null, response };
+      }
 
       // 成功码判断（适配后端响应格式，成功码为 0）
       if (res.code === 0) {
-        return { data: res.data, err: null };
+        return { data: res.data, err: null, response };
       } else {
         // 业务错误
         const error = new CodeNotZeroError(res.code, res.msg || "请求失败");
-        return { data: null, err: error };
+        return { data: null, err: error, response };
       }
     } catch (err: any) {
       // 网络错误或其他错误
-      return { data: null, err };
+      return { data: null, err, response: err?.response ?? null };
     }
   };
 };
+
+export const makeRequest: MakeRequest = <T>(config: RequestConfig) =>
+  makeRequestInternal<T>(config);
+
+/** Real transport entrypoint used by hybrid mode before a possible mock fallback. */
+export const makeRequestForHybrid = <T>(config: RequestConfig) =>
+  makeRequestInternal<T>(config, true);
 
 /**
  * request 函数（兼容性保留）

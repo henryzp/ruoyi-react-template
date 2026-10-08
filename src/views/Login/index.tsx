@@ -1,17 +1,17 @@
-import { Form, Input, Button, Checkbox, Typography } from "antd";
-import { UserOutlined, LockOutlined } from "@ant-design/icons";
-import { useNavigate } from "react-router-dom";
-import type { LoginDto } from "@/types/auth";
-import { useAuthStore } from "@/store/authStore";
-import styles from "./index.module.scss";
+import { Form, Input, Button, Checkbox, Typography } from 'antd';
+import { UserOutlined, LockOutlined } from '@ant-design/icons';
+import { useNavigate } from 'react-router-dom';
+import { useRef, useState } from 'react';
+import type { LoginDto } from '@/types/auth';
+import { useAuthStore } from '@/store/authStore';
+import CaptchaVerify from './CaptchaVerify';
+import styles from './index.module.scss';
 
 const { Title } = Typography;
 
 interface LoginForm {
   username: string;
   password: string;
-  code?: string;
-  uuid?: string;
   rememberMe?: boolean;
 }
 
@@ -22,15 +22,20 @@ export default function Login() {
   const navigate = useNavigate();
   const { login, loading } = useAuthStore();
   const [form] = Form.useForm();
+  const captchaEnabled = import.meta.env.VITE_APP_CAPTCHA_ENABLE === 'true';
+  const [captchaOpen, setCaptchaOpen] = useState(false);
+  const pendingLogin = useRef<LoginForm | null>(null);
 
-  const handleSubmit = async (values: LoginForm) => {
+  const submitLogin = async (
+    values: LoginForm,
+    captchaVerification?: string,
+  ) => {
     try {
       const loginData: LoginDto = {
         username: values.username,
         password: values.password,
         rememberMe: values.rememberMe ?? true,
-        code: values.code,
-        uuid: values.uuid,
+        ...(captchaVerification ? { captchaVerification } : {}),
       };
 
       await login(loginData);
@@ -38,7 +43,7 @@ export default function Login() {
       // 记住我功能
       if (values.rememberMe) {
         localStorage.setItem(
-          "loginForm",
+          'loginForm',
           JSON.stringify({
             username: values.username,
             password: values.password,
@@ -46,18 +51,41 @@ export default function Login() {
           }),
         );
       } else {
-        localStorage.removeItem("loginForm");
+        localStorage.removeItem('loginForm');
       }
 
-      navigate("/home");
+      navigate('/home');
     } catch (error) {
-      console.error("登录失败:", error);
+      console.error('登录失败:', error);
     }
+  };
+
+  const handleSubmit = async (values: LoginForm) => {
+    if (captchaEnabled) {
+      if (captchaOpen) return;
+      pendingLogin.current = values;
+      setCaptchaOpen(true);
+      return;
+    }
+    await submitLogin(values);
+  };
+
+  const handleCaptchaCancel = () => {
+    pendingLogin.current = null;
+    setCaptchaOpen(false);
+  };
+
+  const handleCaptchaSuccess = async (captchaVerification: string) => {
+    const values = pendingLogin.current;
+    pendingLogin.current = null;
+    setCaptchaOpen(false);
+    if (!values) return;
+    await submitLogin(values, captchaVerification);
   };
 
   // 组件挂载时恢复记住我的登录信息
   const initialValues = (() => {
-    const savedForm = localStorage.getItem("loginForm");
+    const savedForm = localStorage.getItem('loginForm');
     if (savedForm) {
       try {
         return JSON.parse(savedForm);
@@ -86,7 +114,7 @@ export default function Login() {
             >
               <Form.Item
                 name="username"
-                rules={[{ required: true, message: "请输入用户名" }]}
+                rules={[{ required: true, message: '请输入用户名' }]}
                 className={styles.loginFormItem}
               >
                 <Input
@@ -98,7 +126,7 @@ export default function Login() {
 
               <Form.Item
                 name="password"
-                rules={[{ required: true, message: "请输入密码" }]}
+                rules={[{ required: true, message: '请输入密码' }]}
                 className={styles.loginFormItem}
               >
                 <Input.Password
@@ -133,6 +161,13 @@ export default function Login() {
           </div>
         </div>
       </div>
+      {captchaEnabled ? (
+        <CaptchaVerify
+          open={captchaOpen}
+          onCancel={handleCaptchaCancel}
+          onSuccess={handleCaptchaSuccess}
+        />
+      ) : null}
     </>
   );
 }

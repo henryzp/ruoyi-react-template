@@ -13,6 +13,7 @@ import {
 import { request } from "@/request";
 import { message } from "antd";
 import { useAppStore } from "@/store/appStore";
+import { mapPermissionInfo, type PermissionInfoDTO } from "@/utils/authAdapter";
 
 /**
  * 认证状态接口
@@ -132,23 +133,13 @@ export const useAuthStore = create<AuthStore>()(
       // 获取用户信息
       getUserInfo: async () => {
         // 调用获取权限信息接口（返回 user、roles、permissions、menus）
-        const response = await request<{
-          user: any;
-          roles: string[];
-          permissions: string[];
-          menus: any[];
-        }>({
+        const response = await request<PermissionInfoDTO>({
           url: "/system/auth/get-permission-info",
           method: "GET",
         });
 
         // 构造 UserInfo 对象
-        const userInfo: any = {
-          ...response.user,
-          roles: response.roles,
-          permissions: response.permissions,
-          menus: response.menus,
-        };
+        const userInfo = mapPermissionInfo(response);
 
         get().setUserInfo(userInfo);
         // 标记用户信息已初始化，防止 Guard 组件重复请求

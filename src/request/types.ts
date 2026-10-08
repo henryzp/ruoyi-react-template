@@ -42,4 +42,6 @@ export interface RequestConfig extends AxiosRequestConfig {
   args?: Record<string, any>;
   /** 是否重试 */
   retry?: boolean | number;
+  /** 将非标准响应体作为 data 原样返回；仅用于明确 opt-in 的接口。 */
+  rawResponse?: boolean;
 }
