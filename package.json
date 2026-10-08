@@ -13,6 +13,7 @@
     "test:hybrid": "node scripts/check-hybrid-contracts.mjs",
     "test:auth-refresh": "node scripts/check-auth-refresh.mjs",
     "test:auth-permission": "node scripts/check-auth-permission.mjs",
+    "test:auth-session": "node scripts/check-auth-session.mjs",
     "format": "prettier --write \"src/**/*.{ts,tsx}\"",
     "preview": "vite preview"
   },

@@ -2,8 +2,6 @@ import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import type { UserInfo, LoginDto, LoginResponse } from "@/types/auth";
 import {
-  TOKEN_KEY,
-  REFRESH_TOKEN_KEY,
   USER_INFO_KEY,
   TENANT_ID_KEY,
   VISIT_TENANT_ID_KEY,
@@ -14,6 +12,15 @@ import { request } from "@/request";
 import { message } from "antd";
 import { useAppStore } from "@/store/appStore";
 import { mapPermissionInfo, type PermissionInfoDTO } from "@/utils/authAdapter";
+import {
+  clearSession,
+  establishSession,
+  ensureSession,
+  getAccessToken,
+  getSessionId,
+  getRefreshToken as getStoredRefreshToken,
+  subscribeAuthLifecycle,
+} from "@/utils/authSession";
 
 /**
  * 认证状态接口
@@ -48,7 +55,7 @@ interface AuthActions {
   /** 初始化用户信息和权限（类似 hr-front 的 setUserInfoAction） */
   initUserInfo: () => Promise<boolean>;
   /** 清除认证信息 */
-  clearAuth: () => void;
+  clearAuth: (expectedSessionId?: string | null) => boolean;
   /** 设置用户信息已初始化标志 */
   setUserInfoInitialized: (initialized: boolean) => void;
 }
@@ -58,8 +65,9 @@ interface AuthActions {
  */
 type AuthStore = AuthState & AuthActions;
 
-let authGeneration = 0;
+let permissionRequestGeneration = 0;
 let permissionRequest: {
+  sessionId: string;
   generation: number;
   promise: Promise<UserInfo>;
 } | null = null;
@@ -71,8 +79,27 @@ function clearPermissionCache() {
 }
 
 function invalidatePermissionRequest() {
-  authGeneration += 1;
+  permissionRequestGeneration += 1;
   permissionRequest = null;
+}
+
+function resetLocalAuthState(event: "cleared" | "changed" | "established") {
+  invalidatePermissionRequest();
+  clearPermissionCache();
+  localStorage.removeItem("app-storage");
+  if (event === "cleared") {
+    localStorage.removeItem("userId");
+    localStorage.removeItem(VISIT_TENANT_ID_KEY);
+  }
+  localStorage.removeItem("auth-storage");
+  useAppStore.getState().reset();
+  useAuthStore.setState({
+    userInfo: null,
+    isAuthenticated: event !== "cleared" && Boolean(getAccessToken()),
+    isUserInfoInitialized: false,
+    isInitializing: false,
+    permissionStatus: "idle",
+  });
 }
 
 /**
@@ -106,13 +133,12 @@ export const useAuthStore = create<AuthStore>()(
             data: credentials,
           });
 
-          // A new successful login invalidates any permission response from an older auth state.
-          invalidatePermissionRequest();
-          clearPermissionCache();
-
           // Login succeeds independently from permission loading.
-          localStorage.setItem(TOKEN_KEY, response.accessToken);
-          localStorage.setItem(REFRESH_TOKEN_KEY, response.refreshToken);
+          localStorage.removeItem(VISIT_TENANT_ID_KEY);
+          establishSession({
+            accessToken: response.accessToken,
+            refreshToken: response.refreshToken,
+          });
 
           // 保存 userId（用于后续请求）
           if (response.userId) {
@@ -142,6 +168,7 @@ export const useAuthStore = create<AuthStore>()(
 
       // 登出
       logout: async () => {
+        const expectedSessionId = getSessionId();
         try {
           // 调用登出接口
           await request({
@@ -151,23 +178,27 @@ export const useAuthStore = create<AuthStore>()(
         } catch (error) {
           console.error("登出接口调用失败:", error);
         } finally {
-          // 清除本地数据
-          get().clearAuth();
-          message.success("已退出登录");
+          if (get().clearAuth(expectedSessionId)) {
+            message.success("已退出登录");
+          }
         }
       },
 
       // 获取用户信息
       getUserInfo: async () => {
-        const token = localStorage.getItem(TOKEN_KEY);
+        const token = ensureSession();
         if (!token) {
           throw new Error("No authentication token available");
         }
 
-        const generation = authGeneration;
-        if (permissionRequest?.generation === generation) {
+        const sessionId = getSessionId();
+        if (!sessionId) {
+          throw new Error("No authentication session available");
+        }
+        if (permissionRequest?.sessionId === sessionId) {
           return permissionRequest.promise;
         }
+        const generation = ++permissionRequestGeneration;
 
         clearPermissionCache();
         set({
@@ -185,7 +216,10 @@ export const useAuthStore = create<AuthStore>()(
             });
             const userInfo = mapPermissionInfo(response);
 
-            if (generation !== authGeneration) {
+            if (
+              generation !== permissionRequestGeneration ||
+              sessionId !== getSessionId()
+            ) {
               return userInfo;
             }
 
@@ -204,7 +238,10 @@ export const useAuthStore = create<AuthStore>()(
             localStorage.setItem(USER_CACHE_KEY, JSON.stringify(userInfo));
             return userInfo;
           } catch (error) {
-            if (generation === authGeneration) {
+            if (
+              generation === permissionRequestGeneration &&
+              sessionId === getSessionId()
+            ) {
               clearPermissionCache();
               set({
                 userInfo: null,
@@ -214,13 +251,16 @@ export const useAuthStore = create<AuthStore>()(
             }
             throw error;
           } finally {
-            if (generation === authGeneration) {
+            if (
+              generation === permissionRequestGeneration &&
+              sessionId === getSessionId()
+            ) {
               set({ isInitializing: false });
             }
           }
         })();
 
-        permissionRequest = { generation, promise };
+        permissionRequest = { sessionId, generation, promise };
         try {
           return await promise;
         } finally {
@@ -233,18 +273,21 @@ export const useAuthStore = create<AuthStore>()(
       // 初始化用户信息和权限（类似 hr-front 的 setUserInfoAction）
       initUserInfo: async () => {
         // 检查是否有 token
-        const token = localStorage.getItem(TOKEN_KEY);
+        const token = ensureSession();
         if (!token) {
           get().clearAuth();
           return false;
         }
-        const generation = authGeneration;
+        const sessionId = getSessionId();
 
         try {
-          await get().getUserInfo();
+          const userInfoPromise = get().getUserInfo();
+          const generation = permissionRequest?.generation;
+          await userInfoPromise;
           if (
-            generation !== authGeneration ||
-            !localStorage.getItem(TOKEN_KEY)
+            generation !== permissionRequestGeneration ||
+            sessionId !== getSessionId() ||
+            !getAccessToken()
           ) {
             return false;
           }
@@ -261,37 +304,8 @@ export const useAuthStore = create<AuthStore>()(
       },
 
       // 清除认证信息
-      clearAuth: () => {
-        invalidatePermissionRequest();
-        console.log("[clearAuth] 被调用！调用栈:", new Error().stack);
-        // 清除所有 localStorage
-        localStorage.removeItem(TOKEN_KEY);
-        localStorage.removeItem(REFRESH_TOKEN_KEY);
-        localStorage.removeItem(USER_INFO_KEY);
-        localStorage.removeItem(VISIT_TENANT_ID_KEY);
-        localStorage.removeItem(MENUS_CACHE_KEY);
-        localStorage.removeItem(USER_CACHE_KEY);
-        localStorage.removeItem("userId");
-        localStorage.removeItem("app-storage");
-        localStorage.removeItem("auth-storage"); // 清除 zustand persist 存储的 auth 状态
-
-        // 清除 appStore 状态（包括 tabs）
-        useAppStore.getState().reset();
-
-        // 清除 authStore 状态
-        set({
-          userInfo: null,
-          isAuthenticated: false,
-          isUserInfoInitialized: false,
-          isInitializing: false,
-          permissionStatus: "idle",
-        });
-
-        // 强制触发 zustand 的持久化更新，确保状态被清除
-        setTimeout(() => {
-          // 通过发送 storage 事件触发 zustand persist 中间件同步
-          window.dispatchEvent(new Event("storage"));
-        }, 0);
+      clearAuth: (expectedSessionId) => {
+        return clearSession(expectedSessionId);
       },
     }),
     {
@@ -307,12 +321,14 @@ export const useAuthStore = create<AuthStore>()(
   ),
 );
 
+subscribeAuthLifecycle((event) => resetLocalAuthState(event));
+
 /**
  * 快捷方法：获取 token
  * 直接从 localStorage 读取，不依赖 store
  */
 export const getToken = () => {
-  return localStorage.getItem(TOKEN_KEY);
+  return getAccessToken();
 };
 
 /**
@@ -320,14 +336,14 @@ export const getToken = () => {
  * 直接从 localStorage 读取，不依赖 store
  */
 export const getRefreshToken = () => {
-  return localStorage.getItem(REFRESH_TOKEN_KEY);
+  return getStoredRefreshToken();
 };
 
 /**
  * 快捷方法：清除认证信息
  */
-export const clearAuth = () => {
-  useAuthStore.getState().clearAuth();
+export const clearAuth = (expectedSessionId?: string | null) => {
+  return useAuthStore.getState().clearAuth(expectedSessionId);
 };
 
 export default useAuthStore;

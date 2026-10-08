@@ -61,6 +61,8 @@ const makeStorage = () => {
   };
 };
 
+const storageListeners = new Set();
+
 const waitFor = async (predicate) => {
   for (let attempt = 0; attempt < 100; attempt += 1) {
     if (predicate()) return;
@@ -75,7 +77,18 @@ try {
   globalThis.window = {
     localStorage: testStorage,
     location: { href: "" },
-    dispatchEvent: () => true,
+    addEventListener: (type, listener) => {
+      if (type === "storage") storageListeners.add(listener);
+    },
+    removeEventListener: (type, listener) => {
+      if (type === "storage") storageListeners.delete(listener);
+    },
+    dispatchEvent: (event) => {
+      if (event.type === "storage") {
+        storageListeners.forEach((listener) => listener(event));
+      }
+      return true;
+    },
   };
 
   let permissionMode = "success";
@@ -85,6 +98,9 @@ try {
   let rejectStale;
   let resolveStale;
   let refreshCalls = 0;
+  let deferLogout = false;
+  let signalLogoutStarted;
+  let resolveLogout;
 
   axios.defaults.adapter = async (config) => {
     if (config.url.includes("/system/auth/login")) {
@@ -113,6 +129,16 @@ try {
         },
         msg: "ok",
       });
+    }
+
+    if (config.url.includes("/system/auth/logout")) {
+      if (deferLogout) {
+        signalLogoutStarted();
+        await new Promise((resolve) => {
+          resolveLogout = resolve;
+        });
+      }
+      return response(config, { code: 0, data: true, msg: "ok" });
     }
 
     if (config.url.includes("/system/auth/get-permission-info")) {
@@ -162,6 +188,7 @@ try {
   const { useAuthStore } = await server.ssrLoadModule(
     "/src/store/authStore.ts",
   );
+  const authSession = await server.ssrLoadModule("/src/utils/authSession.ts");
   const store = useAuthStore.getState();
   const login = (username) => store.login({ username, password: "secret" });
   const reset = () => useAuthStore.getState().clearAuth();
@@ -293,6 +320,71 @@ try {
   );
   assert.equal(storage.getItem("app-token"), "access-rotated");
   assert.equal(useAuthStore.getState().permissionStatus, "ready");
+
+  deferLogout = true;
+  let announceLogoutStarted;
+  const logoutStarted = new Promise((resolve) => {
+    announceLogoutStarted = resolve;
+  });
+  signalLogoutStarted = announceLogoutStarted;
+  const staleLogout = useAuthStore.getState().logout();
+  await logoutStarted;
+  deferLogout = false;
+  await login("second");
+  permissionMode = "success";
+  assert.equal(await useAuthStore.getState().initUserInfo(), true);
+  const sessionB = authSession.getSessionId();
+  resolveLogout();
+  await staleLogout;
+  assert.equal(storage.getItem("app-token"), "access-second");
+  assert.equal(authSession.getSessionId(), sessionB);
+  assert.equal(useAuthStore.getState().isAuthenticated, true);
+  assert.equal(useAuthStore.getState().permissionStatus, "ready");
+  assert.equal(
+    useAuthStore.getState().userInfo?.username,
+    "admin",
+    "a stale logout cannot clear the new session's loaded permissions",
+  );
+
+  const rotatedSessionId = authSession.getSessionId();
+  authSession.setAuthTokens(
+    { accessToken: "access-rotated-again", refreshToken: "refresh-rotated-again" },
+    rotatedSessionId,
+  );
+  window.dispatchEvent({
+    type: "storage",
+    key: "app-token",
+    storageArea: storage,
+  });
+  assert.equal(
+    useAuthStore.getState().permissionStatus,
+    "ready",
+    "token rotation in another tab does not invalidate permissions",
+  );
+
+  storage.setItem("__SESSION_ID__", JSON.stringify("cross-tab-session"));
+  window.dispatchEvent({
+    type: "storage",
+    key: "__SESSION_ID__",
+    storageArea: storage,
+  });
+  assert.equal(useAuthStore.getState().permissionStatus, "idle");
+  assert.equal(useAuthStore.getState().userInfo, null);
+  assert.equal(useAuthStore.getState().isAuthenticated, true);
+  assert.equal(
+    storage.getItem("app-token"),
+    "access-rotated-again",
+    "a session change preserves the new session token",
+  );
+
+  storage.removeItem("__SESSION_ID__");
+  window.dispatchEvent({
+    type: "storage",
+    key: "__SESSION_ID__",
+    storageArea: storage,
+  });
+  assert.equal(useAuthStore.getState().isAuthenticated, false);
+  assert.equal(useAuthStore.getState().permissionStatus, "idle");
 
   console.log("Auth permission lifecycle contracts passed.");
 } finally {

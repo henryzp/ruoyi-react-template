@@ -1,11 +1,12 @@
-import { Form, Input, Button, Checkbox, Typography } from 'antd';
-import { UserOutlined, LockOutlined } from '@ant-design/icons';
-import { useNavigate } from 'react-router-dom';
-import { useRef, useState } from 'react';
-import type { LoginDto } from '@/types/auth';
-import { useAuthStore } from '@/store/authStore';
-import CaptchaVerify from './CaptchaVerify';
-import styles from './index.module.scss';
+import { Form, Input, Button, Checkbox, Typography } from "antd";
+import { UserOutlined, LockOutlined } from "@ant-design/icons";
+import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
+import { useRef, useState } from "react";
+import type { LoginDto } from "@/types/auth";
+import { useAuthStore } from "@/store/authStore";
+import { getSafeRedirectPath } from "@/utils/authRedirect";
+import CaptchaVerify from "./CaptchaVerify";
+import styles from "./index.module.scss";
 
 const { Title } = Typography;
 
@@ -20,9 +21,11 @@ interface LoginForm {
  */
 export default function Login() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const [searchParams] = useSearchParams();
   const { login, loading } = useAuthStore();
   const [form] = Form.useForm();
-  const captchaEnabled = import.meta.env.VITE_APP_CAPTCHA_ENABLE === 'true';
+  const captchaEnabled = import.meta.env.VITE_APP_CAPTCHA_ENABLE === "true";
   const [captchaOpen, setCaptchaOpen] = useState(false);
   const pendingLogin = useRef<LoginForm | null>(null);
 
@@ -43,7 +46,7 @@ export default function Login() {
       // 记住我功能
       if (values.rememberMe) {
         localStorage.setItem(
-          'loginForm',
+          "loginForm",
           JSON.stringify({
             username: values.username,
             password: values.password,
@@ -51,12 +54,22 @@ export default function Login() {
           }),
         );
       } else {
-        localStorage.removeItem('loginForm');
+        localStorage.removeItem("loginForm");
       }
 
-      navigate('/home');
+      const stateFrom = (location.state as { from?: unknown } | null)?.from;
+      const stateRedirect =
+        typeof stateFrom === "string"
+          ? stateFrom
+          : stateFrom && typeof stateFrom === "object"
+            ? `${(stateFrom as { pathname?: string }).pathname ?? ""}${(stateFrom as { search?: string }).search ?? ""}${(stateFrom as { hash?: string }).hash ?? ""}`
+            : null;
+      navigate(
+        getSafeRedirectPath(searchParams.get("redirectUrl") || stateRedirect),
+        { replace: true, state: null },
+      );
     } catch (error) {
-      console.error('登录失败:', error);
+      console.error("登录失败:", error);
     }
   };
 
@@ -85,7 +98,7 @@ export default function Login() {
 
   // 组件挂载时恢复记住我的登录信息
   const initialValues = (() => {
-    const savedForm = localStorage.getItem('loginForm');
+    const savedForm = localStorage.getItem("loginForm");
     if (savedForm) {
       try {
         return JSON.parse(savedForm);
@@ -114,7 +127,7 @@ export default function Login() {
             >
               <Form.Item
                 name="username"
-                rules={[{ required: true, message: '请输入用户名' }]}
+                rules={[{ required: true, message: "请输入用户名" }]}
                 className={styles.loginFormItem}
               >
                 <Input
@@ -126,7 +139,7 @@ export default function Login() {
 
               <Form.Item
                 name="password"
-                rules={[{ required: true, message: '请输入密码' }]}
+                rules={[{ required: true, message: "请输入密码" }]}
                 className={styles.loginFormItem}
               >
                 <Input.Password

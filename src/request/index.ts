@@ -1,12 +1,17 @@
 import axios, { type AxiosResponse, type AxiosError } from "axios";
 import type { BackendResultFormat, RequestConfig } from "./types";
 import { message } from "antd";
-import { getToken, getRefreshToken, clearAuth } from "@/store/authStore";
+import { getToken, clearAuth } from "@/store/authStore";
+import {
+  attachAuthRefreshInterceptors,
+  isAuthHeaderExcludedRequest,
+  isAuthRefreshHandledError,
+} from "./authRefresh";
+import { resolveRouterMode } from "@/router/mode";
+import { createLoginRedirectUrl } from "@/utils/authRedirect";
 
 export type { BackendResultFormat, RequestConfig, ResultFormat } from "./types";
 import {
-  TOKEN_KEY,
-  REFRESH_TOKEN_KEY,
   TENANT_ID_KEY,
   VISIT_TENANT_ID_KEY,
 } from "@/types/auth";
@@ -20,146 +25,13 @@ const instance = axios.create({
 });
 
 /**
- * 是否正在刷新 token
- */
-let isRefreshing = false;
-
-/**
- * 刷新 token 的请求列表
- */
-let requestList: Array<{
-  resolve: (token: string) => void;
-  reject: (error: unknown) => void;
-}> = [];
-
-type AuthSession = { accessToken: string | null; refreshToken: string | null };
-
-class RefreshExpiredError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = "RefreshExpiredError";
-  }
-}
-
-function getCurrentSession(): AuthSession {
-  return { accessToken: getToken(), refreshToken: getRefreshToken() };
-}
-
-function isSameSession(session: AuthSession): boolean {
-  const current = getCurrentSession();
-  return (
-    current.accessToken === session.accessToken &&
-    current.refreshToken === session.refreshToken
-  );
-}
-
-function isExpiredRefreshError(error: any): boolean {
-  return (
-    error instanceof RefreshExpiredError ||
-    error?.response?.status === 401 ||
-    error?.response?.data?.code === 400 ||
-    error?.response?.data?.code === 401
-  );
-}
-
-/**
- * 处理 401 错误：刷新 token 并重试请求
- */
-async function handle401Error(_error: any, config?: any): Promise<any> {
-  // 如果正在刷新 token，将请求加入队列
-  if (isRefreshing) {
-    return new Promise((resolve, reject) => {
-      requestList.push({
-        resolve: (newToken: string) => {
-          if (config?.headers) {
-            config.headers.Authorization = `Bearer ${newToken}`;
-          }
-          resolve(instance(config!));
-        },
-        reject,
-      });
-    });
-  }
-
-  // 开始刷新 token
-  isRefreshing = true;
-  const session = getCurrentSession();
-
-  try {
-    const refreshed = await refreshAccessToken(session.refreshToken);
-    if (!isSameSession(session)) {
-      throw new Error("Authentication session changed during token refresh");
-    }
-    localStorage.setItem(TOKEN_KEY, refreshed.accessToken);
-    localStorage.setItem(REFRESH_TOKEN_KEY, refreshed.refreshToken);
-    isRefreshing = false;
-
-    // 执行队列中的请求
-    requestList.forEach(({ resolve }) => resolve(refreshed.accessToken));
-    requestList = [];
-
-    // 重试当前请求
-    if (config?.headers) {
-      config.headers.Authorization = `Bearer ${refreshed.accessToken}`;
-    }
-    return instance(config!);
-  } catch (refreshError) {
-    // 所有等待请求都失败；仅确认当前会话仍是发起刷新时的会话后才清理。
-    isRefreshing = false;
-    requestList.forEach(({ reject }) => reject(refreshError));
-    requestList = [];
-    if (isSameSession(session) && isExpiredRefreshError(refreshError)) {
-      clearAuth();
-      message.error("登录已过期，请重新登录");
-      window.location.href = "/login";
-    }
-
-    return Promise.reject(refreshError);
-  }
-}
-
-/**
- * 刷新 token
- */
-async function refreshAccessToken(
-  refreshToken: string | null,
-): Promise<{ accessToken: string; refreshToken: string }> {
-  if (!refreshToken) {
-    throw new RefreshExpiredError("No refresh token available");
-  }
-
-  const response = await instance.post<{
-    code: number;
-    data: any;
-    msg: string;
-  }>(`/system/auth/refresh-token`, null, {
-    __isRefreshRequest: true,
-    params: {
-      refreshToken: refreshToken,
-    },
-  } as any);
-
-  if (response.data.code === 0 && response.data.data) {
-    const { accessToken, refreshToken: newRefreshToken } = response.data.data;
-    return { accessToken, refreshToken: newRefreshToken };
-  }
-
-  if (response.data.code === 400 || response.data.code === 401) {
-    throw new RefreshExpiredError("Refresh token failed: " + response.data.msg);
-  }
-  const error = new Error("Refresh token failed: " + response.data.msg);
-  Object.assign(error, { businessCode: response.data.code });
-  throw error;
-}
-
-/**
  * 请求拦截器：注入 token 和租户信息
  */
 instance.interceptors.request.use(
   (config) => {
     // 注入访问令牌
     const token = getToken();
-    if (token && config.headers) {
+    if (token && config.headers && !isAuthHeaderExcludedRequest(config)) {
       config.headers.Authorization = `Bearer ${token}`;
     }
 
@@ -183,28 +55,48 @@ instance.interceptors.request.use(
   },
 );
 
+const routerMode = resolveRouterMode(
+  (import.meta.env as ImportMetaEnv & {
+    readonly VITE_ROUTER_MODE?: string;
+  }).VITE_ROUTER_MODE,
+  import.meta.env.MODE,
+);
+
+const redirectToLogin = () => {
+  window.location.href = createLoginRedirectUrl(routerMode, window.location.href);
+};
+
+attachAuthRefreshInterceptors(instance, {
+  baseURL: import.meta.env.VITE_APP_BASE_API || "/admin-api",
+  timeout: 30000,
+  refreshHeaders: () => {
+    const storage = typeof localStorage === "undefined" ? null : localStorage;
+    const tenantId = storage?.getItem(TENANT_ID_KEY) || "1";
+    const visitTenantId = storage?.getItem(VISIT_TENANT_ID_KEY);
+    return {
+      "Tenant-id": tenantId,
+      ...(visitTenantId ? { "Visit-Tenant-id": visitTenantId } : {}),
+    };
+  },
+  onUnauthorized: (description, sessionId) => {
+    if (!clearAuth(sessionId)) return false;
+    message.error(description || "登录已过期，请重新登录");
+    redirectToLogin();
+    return true;
+  },
+});
+
 /**
  * 响应拦截器：处理 token 刷新和错误
  */
 instance.interceptors.response.use(
   (response: AxiosResponse<BackendResultFormat>) => {
-    // 检查业务错误码 401（HTTP 200 但 code: 401）
-    if (
-      response.data?.code === 401 &&
-      !(response.config as typeof response.config & { __isRefreshRequest?: boolean })
-        .__isRefreshRequest
-    ) {
-      return handle401Error(null, response.config);
-    }
     return response;
   },
   async (error: AxiosError<BackendResultFormat>) => {
     const { response, config } = error;
 
-    if (
-      (config as (typeof config & { __isRefreshRequest?: boolean }) | undefined)
-        ?.__isRefreshRequest
-    ) {
+    if (isAuthRefreshHandledError(error)) {
       return Promise.reject(error);
     }
 
@@ -215,11 +107,6 @@ instance.interceptors.response.use(
         ?.__hybridRequest
     ) {
       return Promise.reject(error);
-    }
-
-    // 处理 401 未认证错误
-    if (response?.status === 401 || response?.data?.code === 401) {
-      return handle401Error(error, config);
     }
 
     // 处理 403 无权限错误

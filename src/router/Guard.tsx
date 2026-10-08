@@ -3,6 +3,9 @@ import { useEffect, type ReactNode } from "react";
 import { Navigate, useLocation } from "react-router-dom";
 import { useAuthStore } from "@/store/authStore";
 import { TOKEN_KEY } from "@/types/auth";
+import { createLoginRedirectUrl } from "@/utils/authRedirect";
+import { ensureSession } from "@/utils/authSession";
+import { resolveRouterMode } from "@/router/mode";
 
 const DEFAULT_WHITE_LIST = ["/login", "/404", "/403"];
 
@@ -41,6 +44,7 @@ export function Guard({
 
     const token = localStorage.getItem(TOKEN_KEY);
     if (!isInWhiteList && token && permissionStatus === "idle") {
+      ensureSession();
       initUserInfo();
     }
   }, [
@@ -62,7 +66,22 @@ export function Guard({
 
   const token = localStorage.getItem(TOKEN_KEY);
   if (!token) {
-    return <Navigate replace state={{ from: location.pathname }} to="/login" />;
+    const routerMode = resolveRouterMode(
+      (
+        import.meta.env as ImportMetaEnv & {
+          readonly VITE_ROUTER_MODE?: string;
+        }
+      ).VITE_ROUTER_MODE,
+      import.meta.env.MODE,
+    );
+    const currentHref = `${location.pathname}${location.search}${location.hash}`;
+    const loginUrl = createLoginRedirectUrl(routerMode, currentHref);
+    const parsedLoginUrl = new URL(loginUrl);
+    const loginRoute =
+      routerMode === "hash"
+        ? parsedLoginUrl.hash.slice(1)
+        : `/login${parsedLoginUrl.search}`;
+    return <Navigate replace to={loginRoute} />;
   }
 
   if (permissionStatus === "error") {
