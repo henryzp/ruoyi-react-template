@@ -9,7 +9,7 @@ export interface DictType {
   type: string;
   status: DictStatus;
   remark?: string;
-  createTime?: string;
+  createTime?: number | string;
 }
 export interface DictData {
   id?: number;
@@ -21,7 +21,7 @@ export interface DictData {
   colorType?: string;
   cssClass?: string;
   remark?: string;
-  createTime?: string;
+  createTime?: number | string;
 }
 export interface DictTypeQuery {
   pageNo: number;

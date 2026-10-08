@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { App, Modal } from 'antd';
 import { createForm } from '@formily/core';
 import { Field, FormProvider } from '@formily/react';
-import { Form, FormItem, Input, NumberPicker, Select } from '@formily/antd-v5';
+import { Form, FormItem, Input, NumberPicker, Select } from '@zpu/formily-antd-v6';
 import { statusOptions } from '../../constants';
 import { createDictData, updateDictData } from '../api';
 import type { DictData, DictDataFormValues } from '../../types';
@@ -57,7 +57,7 @@ const DictDataFormModal = ({
   return (
     <Modal
       open={open}
-      maskClosable={false}
+      mask={{ closable: false }}
       title={mode === 'create' ? '新增字典数据' : '编辑字典数据'}
       onCancel={onCancel}
       afterClose={() => form.reset()}
