@@ -2,15 +2,17 @@ import { useAuthStore } from "@/store/authStore";
 import { checkPermission, type PermissionRule } from "@/utils";
 
 export const usePermission = (rule: PermissionRule) => {
-  const { userInfo, isInitializing, getUserInfo } = useAuthStore();
+  const { userInfo, permissionStatus, initUserInfo } = useAuthStore();
   const permissions = userInfo?.permissions ?? [];
   const roles = userInfo?.roles ?? [];
 
   return {
-    allowed: checkPermission(permissions, rule, { roles }),
-    pending: isInitializing,
-    error: false,
-    reload: getUserInfo,
+    allowed:
+      permissionStatus === "ready" &&
+      checkPermission(permissions, rule, { roles }),
+    pending: permissionStatus === "idle" || permissionStatus === "loading",
+    error: permissionStatus === "error",
+    reload: initUserInfo,
   };
 };
 
@@ -29,7 +31,11 @@ export const useHasPermission = (permission: string | string[]) => {
 /** 是否拥有指定角色（空数组表示不限制） */
 export const useHasRole = (role: string | string[]) => {
   const { userInfo } = useAuthStore();
-  return checkPermission(userInfo?.permissions ?? [], { role }, {
-    roles: userInfo?.roles ?? [],
-  });
+  return checkPermission(
+    userInfo?.permissions ?? [],
+    { role },
+    {
+      roles: userInfo?.roles ?? [],
+    },
+  );
 };

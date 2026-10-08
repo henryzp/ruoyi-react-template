@@ -1,7 +1,10 @@
+import { Button, Result, Spin } from "antd";
 import { useEffect, type ReactNode } from "react";
-import { useNavigate, useLocation } from "react-router-dom";
+import { Navigate, useLocation } from "react-router-dom";
 import { useAuthStore } from "@/store/authStore";
 import { TOKEN_KEY } from "@/types/auth";
+
+const DEFAULT_WHITE_LIST = ["/login", "/404", "/403"];
 
 /**
  * 路由守卫组件属性
@@ -19,17 +22,11 @@ export interface GuardProps {
  */
 export function Guard({
   children,
-  whiteList = ["/login", "/404", "/403"],
+  whiteList = DEFAULT_WHITE_LIST,
 }: GuardProps) {
-  const navigate = useNavigate();
   const location = useLocation();
-  const {
-    isUserInfoInitialized,
-    isInitializing,
-    initUserInfo,
-  } = useAuthStore();
+  const { permissionStatus, isInitializing, initUserInfo } = useAuthStore();
 
-  // 初始化认证逻辑
   useEffect(() => {
     const currentPath = location.pathname;
 
@@ -42,45 +39,49 @@ export function Guard({
       return false;
     });
 
-    // 如果在白名单中，不处理
-    if (isInWhiteList) {
-      return;
-    }
-
-    // 检查是否有 token（直接从 localStorage 读取）
     const token = localStorage.getItem(TOKEN_KEY);
-
-    // 如果没有 token，跳转到登录页
-    if (!token) {
-      navigate("/login", { replace: true, state: { from: currentPath } });
-      return;
+    if (!isInWhiteList && token && permissionStatus === "idle") {
+      initUserInfo();
     }
+  }, [
+    initUserInfo,
+    isInitializing,
+    location.pathname,
+    permissionStatus,
+    whiteList,
+  ]);
 
-    // 如果有 token 但用户信息未初始化且未在初始化中，初始化用户信息
-    if (!isUserInfoInitialized && !isInitializing) {
-      let cancelled = false;
-      const promise = initUserInfo();
+  const isInWhiteList = whiteList.some((path) => {
+    if (path === location.pathname) return true;
+    return (
+      path.endsWith("*") && location.pathname.startsWith(path.slice(0, -1))
+    );
+  });
 
-      promise.then((success) => {
-        if (cancelled) {
-          return;
+  if (isInWhiteList) return <>{children}</>;
+
+  const token = localStorage.getItem(TOKEN_KEY);
+  if (!token) {
+    return <Navigate replace state={{ from: location.pathname }} to="/login" />;
+  }
+
+  if (permissionStatus === "error") {
+    return (
+      <Result
+        extra={
+          <Button loading={isInitializing} onClick={async () => initUserInfo()}>
+            重新加载权限
+          </Button>
         }
-        if (!success) {
-          // 初始化失败（token 无效或接口返回 401），跳转登录页
-          // 注意：如果是因为 401 且有 refresh_token，axios 拦截器会尝试刷新 token
-          // 这里只有 refresh_token 不存在或刷新失败时才会执行
-          navigate("/login", { replace: true });
-        }
-      });
+        status="error"
+        subTitle="账号已登录，但权限信息暂时无法加载。请检查网络后重试。"
+        title="权限信息加载失败"
+      />
+    );
+  }
 
-      // cleanup 函数：组件卸载时标记为已取消
-      return () => {
-        cancelled = true;
-      };
-    }
-  }, [navigate, location, isUserInfoInitialized, isInitializing]);
+  if (permissionStatus !== "ready") return <Spin fullscreen />;
 
-  // 渲染子组件
   return <>{children}</>;
 }
 

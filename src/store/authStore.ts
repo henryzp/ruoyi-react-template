@@ -29,6 +29,8 @@ interface AuthState {
   isUserInfoInitialized: boolean;
   /** 是否正在初始化用户信息（防止重复请求） */
   isInitializing: boolean;
+  /** 用户权限信息加载状态 */
+  permissionStatus: "idle" | "loading" | "ready" | "error";
 }
 
 /**
@@ -56,6 +58,23 @@ interface AuthActions {
  */
 type AuthStore = AuthState & AuthActions;
 
+let authGeneration = 0;
+let permissionRequest: {
+  generation: number;
+  promise: Promise<UserInfo>;
+} | null = null;
+
+function clearPermissionCache() {
+  localStorage.removeItem(USER_INFO_KEY);
+  localStorage.removeItem(MENUS_CACHE_KEY);
+  localStorage.removeItem(USER_CACHE_KEY);
+}
+
+function invalidatePermissionRequest() {
+  authGeneration += 1;
+  permissionRequest = null;
+}
+
 /**
  * 认证 Store
  */
@@ -68,6 +87,7 @@ export const useAuthStore = create<AuthStore>()(
       isAuthenticated: false,
       isUserInfoInitialized: false,
       isInitializing: false,
+      permissionStatus: "idle",
 
       // 设置用户信息
       setUserInfo: (userInfo: UserInfo) => {
@@ -77,7 +97,7 @@ export const useAuthStore = create<AuthStore>()(
 
       // 登录
       login: async (credentials: LoginDto) => {
-        set({ loading: true, isInitializing: true });
+        set({ loading: true });
         try {
           // 调用登录接口
           const response = await request<LoginResponse>({
@@ -86,7 +106,11 @@ export const useAuthStore = create<AuthStore>()(
             data: credentials,
           });
 
-          // 保存 token 到 localStorage
+          // A new successful login invalidates any permission response from an older auth state.
+          invalidatePermissionRequest();
+          clearPermissionCache();
+
+          // Login succeeds independently from permission loading.
           localStorage.setItem(TOKEN_KEY, response.accessToken);
           localStorage.setItem(REFRESH_TOKEN_KEY, response.refreshToken);
 
@@ -95,10 +119,13 @@ export const useAuthStore = create<AuthStore>()(
             localStorage.setItem("userId", String(response.userId));
           }
 
-          // 获取用户信息（getUserInfo 内部会设置 userInfo 和 isUserInfoInitialized）
-          await get().getUserInfo();
-          // 确保 isAuthenticated 状态正确设置
-          set({ isAuthenticated: true });
+          set({
+            userInfo: null,
+            isAuthenticated: true,
+            isUserInfoInitialized: false,
+            isInitializing: false,
+            permissionStatus: "idle",
+          });
 
           // 设置访问租户ID（登录时）
           const tenantId = localStorage.getItem(TENANT_ID_KEY);
@@ -109,7 +136,7 @@ export const useAuthStore = create<AuthStore>()(
           message.error(error.message || "登录失败，请检查用户名和密码");
           throw error;
         } finally {
-          set({ loading: false, isInitializing: false });
+          set({ loading: false });
         }
       },
 
@@ -132,74 +159,99 @@ export const useAuthStore = create<AuthStore>()(
 
       // 获取用户信息
       getUserInfo: async () => {
-        // 调用获取权限信息接口（返回 user、roles、permissions、menus）
-        const response = await request<PermissionInfoDTO>({
-          url: "/system/auth/get-permission-info",
-          method: "GET",
+        const token = localStorage.getItem(TOKEN_KEY);
+        if (!token) {
+          throw new Error("No authentication token available");
+        }
+
+        const generation = authGeneration;
+        if (permissionRequest?.generation === generation) {
+          return permissionRequest.promise;
+        }
+
+        clearPermissionCache();
+        set({
+          userInfo: null,
+          isUserInfoInitialized: false,
+          isInitializing: true,
+          permissionStatus: "loading",
         });
 
-        // 构造 UserInfo 对象
-        const userInfo = mapPermissionInfo(response);
+        const promise = (async () => {
+          try {
+            const response = await request<PermissionInfoDTO>({
+              url: "/system/auth/get-permission-info",
+              method: "GET",
+            });
+            const userInfo = mapPermissionInfo(response);
 
-        get().setUserInfo(userInfo);
-        // 标记用户信息已初始化，防止 Guard 组件重复请求
-        set({ isUserInfoInitialized: true });
+            if (generation !== authGeneration) {
+              return userInfo;
+            }
 
-        // 保存用户信息缓存（包含权限和菜单）
-        if (userInfo.menus) {
-          localStorage.setItem(
-            MENUS_CACHE_KEY,
-            JSON.stringify(userInfo.menus),
-          );
+            get().setUserInfo(userInfo);
+            set({
+              isAuthenticated: true,
+              isUserInfoInitialized: true,
+              permissionStatus: "ready",
+            });
+            if (userInfo.menus) {
+              localStorage.setItem(
+                MENUS_CACHE_KEY,
+                JSON.stringify(userInfo.menus),
+              );
+            }
+            localStorage.setItem(USER_CACHE_KEY, JSON.stringify(userInfo));
+            return userInfo;
+          } catch (error) {
+            if (generation === authGeneration) {
+              clearPermissionCache();
+              set({
+                userInfo: null,
+                isUserInfoInitialized: false,
+                permissionStatus: "error",
+              });
+            }
+            throw error;
+          } finally {
+            if (generation === authGeneration) {
+              set({ isInitializing: false });
+            }
+          }
+        })();
+
+        permissionRequest = { generation, promise };
+        try {
+          return await promise;
+        } finally {
+          if (permissionRequest?.promise === promise) {
+            permissionRequest = null;
+          }
         }
-        localStorage.setItem(USER_CACHE_KEY, JSON.stringify(userInfo));
-
-        return userInfo;
       },
 
       // 初始化用户信息和权限（类似 hr-front 的 setUserInfoAction）
       initUserInfo: async () => {
-        // 防止重复请求
-        if (get().isInitializing) {
-          return false;
-        }
-
         // 检查是否有 token
         const token = localStorage.getItem(TOKEN_KEY);
         if (!token) {
           get().clearAuth();
           return false;
         }
+        const generation = authGeneration;
 
         try {
-          // 设置正在初始化标记
-          set({ isInitializing: true });
-
-          // 调用 getUserInfo 获取最新的权限信息
           await get().getUserInfo();
-          set({ isAuthenticated: true });
-
-          return true;
-        } catch (error: any) {
-          const refreshToken = localStorage.getItem(REFRESH_TOKEN_KEY);
-
-          // 如果没有 refresh_token，直接清除认证信息
-          if (!refreshToken) {
-            get().clearAuth();
-          } else if (
-            error?.response?.status === 401 ||
-            error?.response?.data?.code === 401
+          if (
+            generation !== authGeneration ||
+            !localStorage.getItem(TOKEN_KEY)
           ) {
-            // 如果是 401 错误但有 refresh_token
-            // 说明 axios 拦截器已经尝试刷新 token 但仍然失败
-            // 此时应该清除认证信息
-            get().clearAuth();
+            return false;
           }
-
+          set({ isAuthenticated: true });
+          return true;
+        } catch {
           return false;
-        } finally {
-          // 重置正在初始化标记
-          set({ isInitializing: false });
         }
       },
 
@@ -210,6 +262,7 @@ export const useAuthStore = create<AuthStore>()(
 
       // 清除认证信息
       clearAuth: () => {
+        invalidatePermissionRequest();
         console.log("[clearAuth] 被调用！调用栈:", new Error().stack);
         // 清除所有 localStorage
         localStorage.removeItem(TOKEN_KEY);
@@ -231,6 +284,7 @@ export const useAuthStore = create<AuthStore>()(
           isAuthenticated: false,
           isUserInfoInitialized: false,
           isInitializing: false,
+          permissionStatus: "idle",
         });
 
         // 强制触发 zustand 的持久化更新，确保状态被清除

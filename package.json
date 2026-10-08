@@ -12,6 +12,7 @@
     "test:mock": "node scripts/check-mock-contracts.mjs",
     "test:hybrid": "node scripts/check-hybrid-contracts.mjs",
     "test:auth-refresh": "node scripts/check-auth-refresh.mjs",
+    "test:auth-permission": "node scripts/check-auth-permission.mjs",
     "format": "prettier --write \"src/**/*.{ts,tsx}\"",
     "preview": "vite preview"
   },

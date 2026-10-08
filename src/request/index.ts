@@ -32,6 +32,36 @@ let requestList: Array<{
   reject: (error: unknown) => void;
 }> = [];
 
+type AuthSession = { accessToken: string | null; refreshToken: string | null };
+
+class RefreshExpiredError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "RefreshExpiredError";
+  }
+}
+
+function getCurrentSession(): AuthSession {
+  return { accessToken: getToken(), refreshToken: getRefreshToken() };
+}
+
+function isSameSession(session: AuthSession): boolean {
+  const current = getCurrentSession();
+  return (
+    current.accessToken === session.accessToken &&
+    current.refreshToken === session.refreshToken
+  );
+}
+
+function isExpiredRefreshError(error: any): boolean {
+  return (
+    error instanceof RefreshExpiredError ||
+    error?.response?.status === 401 ||
+    error?.response?.data?.code === 400 ||
+    error?.response?.data?.code === 401
+  );
+}
+
 /**
  * 处理 401 错误：刷新 token 并重试请求
  */
@@ -53,29 +83,36 @@ async function handle401Error(_error: any, config?: any): Promise<any> {
 
   // 开始刷新 token
   isRefreshing = true;
+  const session = getCurrentSession();
 
   try {
-    const newToken = await refreshAccessToken();
+    const refreshed = await refreshAccessToken(session.refreshToken);
+    if (!isSameSession(session)) {
+      throw new Error("Authentication session changed during token refresh");
+    }
+    localStorage.setItem(TOKEN_KEY, refreshed.accessToken);
+    localStorage.setItem(REFRESH_TOKEN_KEY, refreshed.refreshToken);
     isRefreshing = false;
 
     // 执行队列中的请求
-    requestList.forEach(({ resolve }) => resolve(newToken));
+    requestList.forEach(({ resolve }) => resolve(refreshed.accessToken));
     requestList = [];
 
     // 重试当前请求
     if (config?.headers) {
-      config.headers.Authorization = `Bearer ${newToken}`;
+      config.headers.Authorization = `Bearer ${refreshed.accessToken}`;
     }
     return instance(config!);
   } catch (refreshError) {
-    // 刷新失败，清除认证信息并跳转登录页
+    // 所有等待请求都失败；仅确认当前会话仍是发起刷新时的会话后才清理。
     isRefreshing = false;
     requestList.forEach(({ reject }) => reject(refreshError));
     requestList = [];
-    clearAuth();
-
-    message.error("登录已过期，请重新登录");
-    window.location.href = "/login";
+    if (isSameSession(session) && isExpiredRefreshError(refreshError)) {
+      clearAuth();
+      message.error("登录已过期，请重新登录");
+      window.location.href = "/login";
+    }
 
     return Promise.reject(refreshError);
   }
@@ -84,10 +121,11 @@ async function handle401Error(_error: any, config?: any): Promise<any> {
 /**
  * 刷新 token
  */
-async function refreshAccessToken(): Promise<string> {
-  const refreshToken = getRefreshToken();
+async function refreshAccessToken(
+  refreshToken: string | null,
+): Promise<{ accessToken: string; refreshToken: string }> {
   if (!refreshToken) {
-    throw new Error("No refresh token available");
+    throw new RefreshExpiredError("No refresh token available");
   }
 
   const response = await instance.post<{
@@ -95,22 +133,23 @@ async function refreshAccessToken(): Promise<string> {
     data: any;
     msg: string;
   }>(`/system/auth/refresh-token`, null, {
+    __isRefreshRequest: true,
     params: {
       refreshToken: refreshToken,
     },
-  });
+  } as any);
 
   if (response.data.code === 0 && response.data.data) {
     const { accessToken, refreshToken: newRefreshToken } = response.data.data;
-
-    // 保存新 token 到 localStorage
-    localStorage.setItem(TOKEN_KEY, accessToken);
-    localStorage.setItem(REFRESH_TOKEN_KEY, newRefreshToken);
-
-    return accessToken;
+    return { accessToken, refreshToken: newRefreshToken };
   }
 
-  throw new Error("Refresh token failed: " + response.data.msg);
+  if (response.data.code === 400 || response.data.code === 401) {
+    throw new RefreshExpiredError("Refresh token failed: " + response.data.msg);
+  }
+  const error = new Error("Refresh token failed: " + response.data.msg);
+  Object.assign(error, { businessCode: response.data.code });
+  throw error;
 }
 
 /**
@@ -150,13 +189,24 @@ instance.interceptors.request.use(
 instance.interceptors.response.use(
   (response: AxiosResponse<BackendResultFormat>) => {
     // 检查业务错误码 401（HTTP 200 但 code: 401）
-    if (response.data?.code === 401) {
+    if (
+      response.data?.code === 401 &&
+      !(response.config as typeof response.config & { __isRefreshRequest?: boolean })
+        .__isRefreshRequest
+    ) {
       return handle401Error(null, response.config);
     }
     return response;
   },
   async (error: AxiosError<BackendResultFormat>) => {
     const { response, config } = error;
+
+    if (
+      (config as (typeof config & { __isRefreshRequest?: boolean }) | undefined)
+        ?.__isRefreshRequest
+    ) {
+      return Promise.reject(error);
+    }
 
     // Hybrid owns HTTP 404 fallback; leave it to its caller without a toast.
     if (
