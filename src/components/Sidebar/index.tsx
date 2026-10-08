@@ -20,7 +20,7 @@ interface MenuDataType {
  */
 function transformMenus(menus: any[], parentPath = ""): MenuDataType[] {
   return menus
-    .filter((menu) => !menu.hidden) // 过滤隐藏菜单
+    .filter((menu) => !menu.hidden && menu.visible !== "1") // 过滤隐藏菜单
     .map((menu) => {
       // 构建完整路径：父路径 + 当前 path
       // 判断是否需要添加 '/'，避免出现 /systemuser 这种情况
@@ -35,7 +35,7 @@ function transformMenus(menus: any[], parentPath = ""): MenuDataType[] {
 
       const item: MenuDataType = {
         key: fullPath, // key 使用完整路径（自己 + 爸爸 + 爷爷...）
-        label: menu.name,
+        label: menu.menuName ?? menu.name,
         component: menu.component, // 保存 component 字段用于路由跳转
       };
 

@@ -6,10 +6,10 @@ import { makeRequest } from "@/request";
  * 用户状态枚举
  */
 export enum UserStatusEnum {
-  /** 停用 */
-  DISABLE = 0,
   /** 正常 */
-  ENABLE = 1,
+  ENABLE = 0,
+  /** 停用 */
+  DISABLE = 1,
 }
 
 /**
@@ -65,7 +65,7 @@ export interface DeptVO {
   /** 删除标志（0存在 2删除） */
   delFlag?: string;
   /** 创建时间 */
-  createTime?: string;
+  createTime?: number | string;
   /** 子部门 */
   children?: DeptVO[];
 }
@@ -77,7 +77,7 @@ export interface UserVO {
   /** 用户ID */
   id?: number;
   /** 部门ID */
-  deptId: number;
+  deptId: number | null;
   /** 用户账号 */
   username: string;
   /** 用户昵称 */
@@ -93,9 +93,12 @@ export interface UserVO {
   /** 部门名称 */
   deptName?: string;
   /** 最后登录时间 */
-  loginDate?: string;
+  loginDate?: number | string;
   /** 创建时间 */
-  createTime?: string;
+  createTime?: number | string;
+  avatar?: string;
+  postIds?: number[];
+  password?: string;
   /** 备注 */
   remark?: string;
 }
@@ -114,6 +117,8 @@ export interface UserPageParam {
   status?: number;
   /** 部门ID */
   deptId?: number;
+  /** 角色ID（query contract; no current page filter control） */
+  roleId?: number;
   /** 时间范围 */
   createTime?: string[];
 }
@@ -157,7 +162,7 @@ export function toTablePageResult<T>(
 /**
  * 查询部门列表（平铺结构，前端构建树）
  */
-export const getDeptTree = makeRequest<DeptVO[]>({
+const getDeptTreeRaw = makeRequest<DeptVO[]>({
   url: "/system/dept/list",
   method: "GET",
 });
@@ -165,7 +170,7 @@ export const getDeptTree = makeRequest<DeptVO[]>({
 /**
  * 查询部门列表（平铺列表）
  */
-export const getDeptList = makeRequest<DeptVO[]>({
+const getDeptListRaw = makeRequest<DeptVO[]>({
   url: "/system/dept/list",
   method: "GET",
 });
@@ -173,7 +178,7 @@ export const getDeptList = makeRequest<DeptVO[]>({
 /**
  * 查询部门详情
  */
-export const getDept = makeRequest<DeptVO, { id: number }>({
+const getDeptRaw = makeRequest<DeptVO, { id: number }>({
   url: "/system/dept/get",
   method: "GET",
 });
@@ -183,15 +188,92 @@ export const getDept = makeRequest<DeptVO, { id: number }>({
 /**
  * 查询用户分页列表
  */
-export const getUserPage = makeRequest<PageResult<UserVO>, UserPageParam>({
+interface UserDTO extends Omit<UserVO, 'phone' | 'deptName' | 'loginDate' | 'createTime'> {
+  deptName?: string | null;
+  loginDate?: number | null;
+  createTime?: number;
+  mobile?: string;
+  postIds?: number[];
+  avatar?: string;
+  loginIp?: string;
+}
+
+const userSnapshots = new Map<number, UserDTO>();
+const toUserVO = (raw: UserDTO): UserVO => {
+  if (raw.id !== undefined) userSnapshots.set(raw.id, { ...raw });
+  return {
+    id: raw.id,
+    deptId: raw.deptId ?? null,
+    username: raw.username,
+    nickname: raw.nickname,
+    email: raw.email,
+    phone: raw.mobile,
+    sex: raw.sex,
+    status: raw.status,
+    deptName: raw.deptName ?? undefined,
+    loginDate: raw.loginDate,
+    createTime: raw.createTime,
+    remark: raw.remark,
+    avatar: raw.avatar,
+    postIds: raw.postIds,
+  };
+};
+const toUserDTO = (input: UserVO, includePassword = false): UserDTO => {
+  const previous = input.id === undefined ? undefined : userSnapshots.get(input.id);
+  return {
+    ...(input.id !== undefined ? { id: input.id } : {}),
+    deptId: input.deptId ?? null,
+    username: input.username,
+    nickname: input.nickname,
+    email: input.email,
+    mobile: input.phone ?? previous?.mobile,
+    remark: input.remark,
+    avatar: input.avatar ?? previous?.avatar,
+    postIds: input.postIds ?? previous?.postIds,
+    ...(includePassword && input.password ? { password: input.password } : {}),
+    sex: input.sex,
+    status: input.status,
+  };
+};
+const mapDept = (dept: DeptVO): DeptVO => ({
+  ...dept,
+  deptName: dept.name || dept.deptName,
+  children: dept.children?.map(mapDept),
+});
+const mapResult = <Input, Output>(
+  data: Input | null,
+  err: Error | null,
+  response: unknown,
+  map: (value: Input) => Output,
+): { data: Output | null; err: Error | null; response: unknown } => ({
+  data: data === null ? null : map(data),
+  err,
+  response,
+});
+
+export const getDeptTree = async (config?: Parameters<typeof getDeptTreeRaw>[0]) => {
+  const result = await getDeptTreeRaw(config);
+  return mapResult(result.data, result.err, result.response, (items) => items.map(mapDept));
+};
+export const getDeptList = async (config?: Parameters<typeof getDeptListRaw>[0]) => {
+  const result = await getDeptListRaw(config);
+  return mapResult(result.data, result.err, result.response, (items) => items.map(mapDept));
+};
+export const getDept = async (config?: Parameters<typeof getDeptRaw>[0]) => {
+  const result = await getDeptRaw(config);
+  return mapResult(result.data, result.err, result.response, mapDept);
+};
+
+const getUserPageRaw = makeRequest<PageResult<UserDTO>, UserPageParam>({
   url: "/system/user/page",
   method: "GET",
 });
+const getUserQuery = (params?: UserPageParam) => params ? { ...params, mobile: params.phone, phone: undefined } : params;
 
 /**
  * 查询用户详情
  */
-export const getUser = makeRequest<UserVO, { id: number }>({
+const getUserRaw = makeRequest<UserDTO, { id: number }>({
   url: "/system/user/get",
   method: "GET",
 });
@@ -199,7 +281,7 @@ export const getUser = makeRequest<UserVO, { id: number }>({
 /**
  * 新增用户
  */
-export const createUser = makeRequest<void, UserVO>({
+const createUserRaw = makeRequest<void, UserDTO>({
   url: "/system/user/create",
   method: "POST",
 });
@@ -207,7 +289,7 @@ export const createUser = makeRequest<void, UserVO>({
 /**
  * 修改用户
  */
-export const updateUser = makeRequest<void, UserVO>({
+const updateUserRaw = makeRequest<void, UserDTO>({
   url: "/system/user/update",
   method: "PUT",
 });
@@ -242,7 +324,32 @@ export const resetUserPassword = makeRequest<
 /**
  * 导出用户
  */
-export const exportUser = makeRequest<Blob, UserPageParam>({
+const exportUserRaw = makeRequest<Blob, UserPageParam>({
   url: "/system/user/export-excel",
   method: "GET",
 });
+
+export const getUserPage = async (config?: Parameters<typeof getUserPageRaw>[0]) => {
+  const result = await getUserPageRaw({
+    ...config,
+    params: getUserQuery(config?.params),
+  });
+  return mapResult(result.data, result.err, result.response, (page) => ({
+    ...page,
+    list: page.list.map(toUserVO),
+  }));
+};
+
+export const exportUser = async (config?: Parameters<typeof exportUserRaw>[0]) =>
+  exportUserRaw({ ...config, params: getUserQuery(config?.params) });
+
+export const getUser = async (config?: Parameters<typeof getUserRaw>[0]) => {
+  const result = await getUserRaw(config);
+  return mapResult(result.data, result.err, result.response, toUserVO);
+};
+
+export const createUser = async (config?: Parameters<typeof createUserRaw>[0]) =>
+  createUserRaw({ ...config, data: config?.data ? toUserDTO(config.data, true) : config?.data });
+
+export const updateUser = async (config?: Parameters<typeof updateUserRaw>[0]) =>
+  updateUserRaw({ ...config, data: config?.data ? toUserDTO(config.data) : config?.data });

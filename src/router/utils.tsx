@@ -95,8 +95,8 @@ function loadComponent(
  */
 function transformMenuToRoute(
   menu: MenuItem,
-  parentPath = "",
 ): RouteObject | null {
+  if (menu.menuType === "F") return null;
   // 跳过按钮类型和隐藏的菜单
   // 注意：后端可能没有 menuType 字段，所以根据 component 和 children 来判断
   const hasComponent = menu.component && menu.component.length > 0;
@@ -107,18 +107,10 @@ function transformMenuToRoute(
     return null;
   }
 
-  // 构建完整路径：父路径 + 当前 path
-  let fullPath = "";
-  if (parentPath) {
-    fullPath = menu.path.startsWith("/")
-      ? `${parentPath}${menu.path}`
-      : `${parentPath}/${menu.path}`;
-  } else {
-    fullPath = menu.path;
-  }
-
+  // Child route paths are relative to their parent RouteObject.
+  const routePath = menu.path.replace(/^\/+|\/+$/g, "");
   const route: RouteObject = {
-    path: fullPath,
+    ...(routePath ? { path: routePath } : {}),
   };
 
   // 如果有组件路径，则加载组件
@@ -132,7 +124,7 @@ function transformMenuToRoute(
   // 递归处理子菜单
   if (hasChildren) {
     const childRoutes = menu
-      .children!.map((child) => transformMenuToRoute(child, fullPath))
+      .children!.map((child) => transformMenuToRoute(child))
       .filter((route): route is RouteObject => route !== null);
 
     if (childRoutes.length > 0) {
@@ -156,6 +148,6 @@ export function transformMenusToRoutes(
   }
 
   return menus
-    .map((menu) => transformMenuToRoute(menu, ""))
+    .map((menu) => transformMenuToRoute(menu))
     .filter((route): route is RouteObject => route !== null);
 }

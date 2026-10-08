@@ -8,9 +8,8 @@ import type { MockHandler, MockRequestConfig } from '../types';
 import { failure, success } from '../utils';
 import { DICT_TYPE } from '@/utils/dict';
 
-const now = '2026-08-24 12:00:00';
-const currentTime = () =>
-  new Date().toISOString().slice(0, 19).replace('T', ' ');
+const now = Date.now();
+const currentTime = () => Date.now();
 
 const dictTypes: DictType[] = [
   {
@@ -60,7 +59,7 @@ const dictTypes: DictType[] = [
     type: 'system_user_sex',
     status: 0,
     remark: '系统用户性别',
-    createTime: '2021-01-05 17:03:48',
+    createTime: now,
   },
   {
     id: 3001,
@@ -328,7 +327,7 @@ const dictData: DictData[] = [
     colorType: 'default',
     cssClass: 'A',
     remark: '性别男',
-    createTime: '2021-01-05 17:04:02',
+    createTime: now,
   },
   {
     id: 2,
@@ -339,7 +338,7 @@ const dictData: DictData[] = [
     status: 0,
     colorType: 'success',
     remark: '性别女',
-    createTime: '2021-01-05 17:04:02',
+    createTime: now,
   },
   {
     id: 3101,

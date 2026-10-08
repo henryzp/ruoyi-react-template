@@ -5,8 +5,13 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev:mock": "vite --mode mock --port 3001",
+    "dev:hybrid": "vite --mode hybrid --port 3002",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
+    "test:mock": "node scripts/check-mock-contracts.mjs",
+    "test:hybrid": "node scripts/check-hybrid-contracts.mjs",
+    "test:auth-refresh": "node scripts/check-auth-refresh.mjs",
     "format": "prettier --write \"src/**/*.{ts,tsx}\"",
     "preview": "vite preview"
   },

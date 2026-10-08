@@ -167,6 +167,19 @@ export default function EditModal({
           <Input placeholder="请输入用户账号" disabled={!!userId} />
         </Form.Item>
 
+        {!userId && (
+          <Form.Item
+            label="初始密码"
+            name="password"
+            rules={[
+              { required: true, message: "请输入初始密码" },
+              { min: 6, max: 20, message: "密码长度必须在6到20个字符之间" },
+            ]}
+          >
+            <Input.Password placeholder="请输入初始密码" />
+          </Form.Item>
+        )}
+
         <Form.Item
           label="用户昵称"
           name="nickname"

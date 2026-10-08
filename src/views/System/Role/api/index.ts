@@ -6,10 +6,10 @@ import { makeRequest } from "@/request";
  * 角色状态枚举
  */
 export enum RoleStatusEnum {
-  /** 停用 */
-  DISABLE = 0,
   /** 正常 */
-  ENABLE = 1,
+  ENABLE = 0,
+  /** 停用 */
+  DISABLE = 1,
 }
 
 /**
@@ -49,7 +49,9 @@ export interface RoleVO {
   /** 备注 */
   remark?: string;
   /** 创建时间 */
-  createTime?: string;
+  createTime?: number | string;
+  type?: number;
+  dataScopeDeptIds?: number[] | null;
 }
 
 /**

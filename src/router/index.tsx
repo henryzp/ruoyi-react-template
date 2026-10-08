@@ -1,11 +1,12 @@
 import { useMemo, lazy } from "react";
-import { HashRouter, Navigate, useRoutes } from "react-router-dom";
+import { BrowserRouter, HashRouter, Navigate, useRoutes } from "react-router-dom";
 import type { RouteObject } from "react-router-dom";
 import BasicLayout from "@/layouts/BasicLayout";
 import { staticRoutes } from "./staticRoutes";
 import { transformMenusToRoutes } from "./utils";
 import { Guard } from "./Guard";
 import { useAuthStore } from "@/store/authStore";
+import { resolveRouterMode } from "./mode";
 
 /**
  * 内部路由组件（在 Router 上下文中）
@@ -57,11 +58,12 @@ function RouterContent() {
  * 应用路由组件
  */
 export function AppRouter() {
-  return (
-    <HashRouter>
-      <RouterContent />
-    </HashRouter>
+  const mode = resolveRouterMode(
+    (import.meta.env as ImportMetaEnv & { readonly VITE_ROUTER_MODE?: string }).VITE_ROUTER_MODE,
+    import.meta.env.MODE,
   );
+  const Router = mode === "hash" ? HashRouter : BrowserRouter;
+  return <Router><RouterContent /></Router>;
 }
 
 export default AppRouter;
